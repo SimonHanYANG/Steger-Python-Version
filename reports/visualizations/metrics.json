@@ -1,0 +1,25 @@
+{
+  "data_type": "synthetic; no real sperm samples",
+  "bending": {
+    "measured_angle_deg": 62.99947666905524,
+    "expected_angle_deg": 63.0,
+    "absolute_angle_error_deg": 0.0005233309447589818,
+    "source": "stored CLI result"
+  },
+  "noisy_line": {
+    "case": {
+      "model": "gaussian",
+      "half_width": 1.5,
+      "angle_deg": 37,
+      "offset": -0.319,
+      "asymmetry": 0.35,
+      "noise": 3,
+      "polarity": "dark",
+      "quantize": true,
+      "seed": 20261104,
+      "quadrature": 32
+    },
+    "final_position_error_p95_px": 0.03418185452373662,
+    "before_extra_fit_p95_px": 0.04284537378027627
+  }
+}

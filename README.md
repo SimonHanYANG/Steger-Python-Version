@@ -8,6 +8,24 @@ The implementation follows the Gaussian derivatives, Hessian-based subpixel loca
 
 **Accuracy scope:** This is an independent implementation, not a wrapper around HALCON's native libraries. An additional fit to the original grayscale profile is enabled by default to reduce pixel sampling error. Synthetic ground-truth validation, validation on real sperm images, and agreement with HALCON outputs are separate evaluations. The latter two have not yet been completed.
 
+## Visual examples
+
+The following results use synthetic data with known geometry. Validation on real sperm images is pending.
+
+![Grayscale ROI, segmentation mask, extracted centerline, and bending measurement](reports/visualizations/neck-bending-demo.png)
+
+The green curve is the extracted centerline. Cyan and amber indicate the fitted end directions. The measured angle is **62.9995 degrees**, compared with a known window direction difference of **63.0000 degrees**.
+
+![Noisy dark-line extraction and signed centerline error](reports/visualizations/noisy-line-demo.png)
+
+For this asymmetric dark Gaussian line with contrast 150, noise standard deviation 3, and 8-bit quantization, the final P95 position error is **0.0342 px**. The error plot also shows the result before the additional grayscale profile fit; these are outputs of this implementation, not HALCON measurements.
+
+Regenerate these figures with:
+
+```bash
+uv run --extra dev python tools/visualize_results.py
+```
+
 ## Installation
 
 The project uses uv and Python 3.12:
