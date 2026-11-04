@@ -22,10 +22,16 @@ from PIL import Image
 
 from steger.io import write_json
 from steger.measurement import measure_bending
+from steger.neck import measure_neck
 
 
 def compute_from_arrays(roi, neck_mask, *, mode="adaptive"):
     """No saved contour/index/per-image parameter is accepted by this function."""
+    if mode == "adaptive":
+        output = measure_neck(roi, neck_mask)
+        return {key: output[key] for key in ("angle_deg", "status")}
+    if mode != "fixed_sigma_2":
+        raise ValueError("Unknown worker mode")
     image = np.asarray(roi)
     if image.ndim == 3 and image.shape[-1] >= 3:
         image = np.asarray(image[..., :3], dtype=np.float64) @ np.array([0.299, 0.587, 0.114])
@@ -39,21 +45,11 @@ def compute_from_arrays(roi, neck_mask, *, mode="adaptive"):
     if image.ndim != 2 or image.shape != mask.shape:
         raise ValueError("Expected aligned 2-D or RGB ROI and neck mask")
     geometry = batch.mask_geometry(mask)
-    scales = batch.SCALES if mode == "adaptive" else (2.0,)
-    candidates = batch.candidate_runs(image, geometry, scales)
-    if mode == "adaptive" and not any(
-        c["span_coverage"] >= 0.75 and c["length_px"] >= 15 for c in candidates
-    ):
-        candidates.extend(batch.candidate_runs(image, geometry, batch.RESCUE_SCALES))
+    candidates = batch.candidate_runs(image, geometry, (2.0,))
     selected = batch.choose_candidate(candidates)
     if selected is None:
         return {"angle_deg": None, "status": "no_line"}
-    # This final run reproduces the existing analysis path, with trace capture off.
-    result = batch.detect(image, geometry["mask"], selected["sigma"], selected["polarity"])
-    contour = result.contours[selected["contour_index"]]
-    if mode == "adaptive":
-        assessed = batch.assess(contour, selected, candidates)
-        return {"angle_deg": assessed["angle_deg"], "status": assessed["status"]}
+    contour = selected.contour
     if selected["span_coverage"] < 0.75:
         return {"angle_deg": None, "status": "insufficient_segment"}
     try:

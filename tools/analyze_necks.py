@@ -21,16 +21,24 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import LineCollection
-from scipy import ndimage
 
-from steger import lines_gauss
 from steger.io import read_image, write_json
-from steger.measurement import measure_bending
+from steger.neck import (
+    HIGH,
+    LOW,
+    RESCUE_SCALES,
+    SCALES,
+    assess,
+    candidate_runs,
+    choose_candidate,
+    detect,
+    mask_geometry,
+)
+from steger.neck import (
+    contour_metrics as contour_metrics,
+)
 from steger.visualization import save_process_report
 
-SCALES = (1.0, 1.5, 2.0, 2.5, 3.0)
-RESCUE_SCALES = (3.5, 4.0, 4.5)
-LOW, HIGH = 0.05, 0.15
 STATUS_ZH = {
     "estimated": "可测估计",
     "review_required": "需复核",
@@ -63,163 +71,6 @@ def image_pairs(directory):
     if not images:
         raise ValueError(f"No PNG image/mask pairs in {root}")
     return [(p, masks[p.stem]) for p in images]
-
-
-def mask_geometry(mask):
-    """Use the largest 8-connected component; preserve the original for display."""
-    mask = np.asarray(mask, dtype=bool)
-    labels, count = ndimage.label(mask, structure=np.ones((3, 3)))
-    if not count:
-        raise ValueError("Empty neck mask")
-    sizes = np.bincount(labels.ravel())
-    sizes[0] = 0
-    selected = labels == np.argmax(sizes)
-    pixels = np.argwhere(selected)
-    if len(pixels) < 6:
-        raise ValueError("Neck mask contains fewer than six pixels")
-    _, _, vt = np.linalg.svd(pixels - pixels.mean(axis=0), full_matrices=False)
-    axis = vt[0]
-    span = float(np.ptp(pixels @ axis))
-    if span < 1:
-        raise ValueError("Degenerate mask extent")
-    distance = ndimage.distance_transform_edt(np.pad(selected, 1))[1:-1, 1:-1]
-    return {
-        "mask": selected,
-        "axis": axis,
-        "span": span,
-        "distance": distance,
-        "component_count": int(count),
-        "ignored_mask_pixels": int(mask.sum() - selected.sum()),
-        "touches_roi_border": bool(
-            selected[0].any() or selected[-1].any() or selected[:, 0].any() or selected[:, -1].any()
-        ),
-    }
-
-
-def contour_metrics(contour, geometry):
-    coverage = float(np.ptp(contour.points @ geometry["axis"]) / geometry["span"])
-    depth = ndimage.map_coordinates(geometry["distance"], contour.points.T, order=1)
-    centrality = float(np.median(depth) / geometry["distance"].max())
-    return {"span_coverage": coverage, "centrality": centrality, "length_px": contour.length}
-
-
-def candidate_runs(image, geometry, scales=SCALES):
-    records = []
-    for sigma in scales:
-        for polarity in ("dark", "light"):
-            result = detect(image, geometry["mask"], sigma, polarity)
-            for index, contour in enumerate(result.contours):
-                if contour.closed or len(contour.points) < 6:
-                    continue
-                metrics = contour_metrics(contour, geometry)
-                # The relaxed length is for a separately labelled LOCAL estimate only.
-                try:
-                    local = measure_bending(contour, min_window_length=0.5)
-                except ValueError:
-                    continue
-                records.append(
-                    {
-                        "sigma": sigma,
-                        "polarity": polarity,
-                        "contour_index": index,
-                        **metrics,
-                        "local_angle_deg": local.angle_deg,
-                        "points": contour.points,
-                    }
-                )
-    return records
-
-
-def detect(image, mask, sigma, polarity, *, trace=False):
-    # Width/asymmetry/profile models have not been validated on these phase-like
-    # real micrographs. Keep the measured grayscale ridge and expose every stage.
-    return lines_gauss(
-        image,
-        sigma,
-        LOW,
-        HIGH,
-        polarity,
-        False,
-        "none",
-        False,
-        mask=mask,
-        profile_refinement=False,
-        return_trace=trace,
-    )
-
-
-def choose_candidate(candidates):
-    """Favor extent, then a declared reference scale; never select by angle."""
-    if not candidates:
-        return None
-    best_coverage = max(c["span_coverage"] for c in candidates)
-    eligible = [c for c in candidates if c["span_coverage"] >= best_coverage - 0.05]
-    adequate = [c for c in eligible if c["span_coverage"] >= 0.75 and c["length_px"] >= 15]
-    if adequate:
-        eligible = adequate
-    return max(
-        eligible,
-        key=lambda c: (-abs(c["sigma"] - 2.0), c["centrality"], c["sigma"]),
-    )
-
-
-def assess(contour, selected, candidates):
-    local = measure_bending(contour, min_window_length=0.5)
-    flags = []
-    if selected["span_coverage"] < 0.75:
-        flags.append("insufficient_span_coverage")
-    try:
-        measurement = measure_bending(contour)
-    except ValueError:
-        measurement = None
-        flags.append("fit_windows_shorter_than_3px")
-    # Extent measures projection on the mask's major axis, NOT anatomical truth.
-    nearby = []
-    for sigma in sorted({c["sigma"] for c in candidates}):
-        options = [
-            c for c in candidates if c["sigma"] == sigma and c["polarity"] == selected["polarity"]
-        ]
-        if not options:
-            continue
-        item = max(options, key=lambda c: (c["span_coverage"], c["centrality"]))
-        if item["span_coverage"] >= selected["span_coverage"] - 0.08 and item["length_px"] >= 15:
-            nearby.append(item["local_angle_deg"])
-    scale_range = [float(min(nearby)), float(max(nearby))] if nearby else None
-    if len(nearby) < 2:
-        flags.append("insufficient_comparable_scales")
-    elif scale_range[1] - scale_range[0] > 5:
-        flags.append("scale_sensitive_over_5deg")
-    window_angles = []
-    for window in (0.15, 0.2, 0.25):
-        try:
-            m = measure_bending(contour, window_fraction=window)
-            window_angles.append({"window_fraction": window, "angle_deg": m.angle_deg})
-        except ValueError:
-            pass
-    window_range = (
-        [min(v["angle_deg"] for v in window_angles), max(v["angle_deg"] for v in window_angles)]
-        if window_angles
-        else None
-    )
-    if window_range and window_range[1] - window_range[0] > 5:
-        flags.append("window_sensitive_over_5deg")
-    if selected["centrality"] < 0.4:
-        flags.append("ridge_near_mask_boundary")
-    if selected["sigma"] > max(SCALES):
-        flags.append("large_scale_rescue_requires_review")
-    insufficient = "insufficient_span_coverage" in flags or measurement is None
-    status = "insufficient_segment" if insufficient else "review_required" if flags else "estimated"
-    return {
-        "status": status,
-        "angle_deg": None if insufficient else measurement.angle_deg,
-        "local_segment_angle_deg": local.angle_deg,
-        "measurement": (measurement or local).to_dict(),
-        "quality_flags": flags,
-        "scale_angle_range_deg": scale_range,
-        "comparable_scale_count": len(nearby),
-        "window_angle_range_deg": window_range,
-        "window_sensitivity": window_angles,
-    }
 
 
 def _base(axis, image, mask, title):

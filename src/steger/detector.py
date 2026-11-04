@@ -90,25 +90,127 @@ def lines_gauss(
     selected = np.ones(img.shape, dtype=bool) if mask is None else np.asarray(mask) != 0
     if selected.shape != img.shape:
         raise ValueError("mask and image shapes must match; supply an aligned mask")
-    derivatives = image_derivatives(img, sigma, border=border)
-    if return_trace:
-        normals, response, eigenvalues = hessian_normals(
-            derivatives, light_dark, with_eigenvalues=True
+    fields = _RidgeFields(img, sigma, border, selected, return_trace)
+    return _extract(
+        fields,
+        sigma=sigma,
+        low=low,
+        high=high,
+        light_dark=light_dark,
+        extract_width=extract_width,
+        line_model=line_model,
+        complete_junctions=complete_junctions,
+        selected=selected,
+        mask_used=mask is not None,
+        min_length=min_length,
+        border=border,
+        refine=refine,
+        profile_refinement=profile_refinement,
+        return_trace=return_trace,
+    )
+
+
+class _RidgeFields:
+    """Per-image/per-scale fields, shared by the two independent polarities.
+
+    No global image cache. Convolution and spline filtering still use the entire
+    original ROI. Masked eigensystems are independent 2x2 problems; trace mode
+    computes the full field so process visualizations retain all original values.
+    """
+
+    def __init__(self, image, sigma, border, selected, trace):
+        self.image = image
+        self.derivatives = d = image_derivatives(image, sigma, border=border)
+        self.eigenvalues = None
+        if trace:
+            self.normals, self.dark_response, self.eigenvalues = hessian_normals(
+                d, "dark", with_eigenvalues=True
+            )
+        elif selected.all():
+            self.normals, self.dark_response = hessian_normals(d, "dark")
+        else:
+            n, response = hessian_normals({k: v[selected] for k, v in d.items()}, "dark")
+            self.normals = np.zeros((*image.shape, 2), dtype=np.float64)
+            self.dark_response = np.zeros(image.shape, dtype=np.float64)
+            self.normals[selected], self.dark_response[selected] = n, response
+        nr, nc = self.normals[..., 0], self.normals[..., 1]
+        self.denominator = denominator = (
+            d["rr"] * nr * nr + 2 * d["rc"] * nr * nc + d["cc"] * nc * nc
         )
-    else:
-        normals, response = hessian_normals(derivatives, light_dark)
-    nr, nc = normals[..., 0], normals[..., 1]
-    denominator = (
-        derivatives["rr"] * nr * nr + 2 * derivatives["rc"] * nr * nc + derivatives["cc"] * nc * nc
+        self.t = np.zeros(image.shape)
+        np.divide(
+            -(d["r"] * nr + d["c"] * nc),
+            denominator,
+            out=self.t,
+            where=np.abs(denominator) > 1e-14,
+        )
+        self.off = self.t[..., None] * self.normals
+        self._coefficients = None
+
+    @property
+    def coefficients(self):
+        if self._coefficients is None:
+            self._coefficients = {
+                k: spline_filter(v, order=3, mode="reflect") for k, v in self.derivatives.items()
+            }
+        return self._coefficients
+
+
+def _detect_neck_polarities(image, mask, sigma, low, high):
+    """Internal fixed-policy path; keep separate Newton stopping per polarity."""
+    img = np.asarray(image, dtype=np.float64)
+    selected = np.asarray(mask) != 0
+    if img.ndim != 2 or min(img.shape, default=0) < 3:
+        raise ValueError("image must be a 2-D grayscale image at least 3x3")
+    if selected.shape != img.shape:
+        raise ValueError("mask and image shapes must match; supply an aligned mask")
+    if not np.isfinite(img).all():
+        raise ValueError("image contains NaN or infinity")
+    fields = _RidgeFields(img, sigma, "reflect", selected, False)
+    return tuple(
+        _extract(
+            fields,
+            sigma=sigma,
+            low=low,
+            high=high,
+            light_dark=polarity,
+            extract_width=False,
+            line_model="none",
+            complete_junctions=False,
+            selected=selected,
+            mask_used=True,
+            min_length=0.0,
+            border="reflect",
+            refine=True,
+            profile_refinement=False,
+            return_trace=False,
+        )
+        for polarity in ("dark", "light")
     )
-    t = np.zeros(img.shape)
-    np.divide(
-        -(derivatives["r"] * nr + derivatives["c"] * nc),
-        denominator,
-        out=t,
-        where=np.abs(denominator) > 1e-14,
-    )
-    off = t[..., None] * normals
+
+
+def _extract(
+    fields,
+    *,
+    sigma,
+    low,
+    high,
+    light_dark,
+    extract_width,
+    line_model,
+    complete_junctions,
+    selected,
+    mask_used,
+    min_length,
+    border,
+    refine,
+    profile_refinement,
+    return_trace,
+):
+    img, derivatives = fields.image, fields.derivatives
+    normals, eigenvalues = fields.normals, fields.eigenvalues
+    response = -fields.dark_response if light_dark == "light" else fields.dark_response
+    denominator, t, off = fields.denominator, fields.t, fields.off
     # A single Taylor step can slightly overshoot 0.5 px for a ridge exactly
     # between two pixel centers, dropping BOTH pixels. Admit a wider initial
     # neighborhood only when Newton refinement will verify the final location.
@@ -146,7 +248,7 @@ def lines_gauss(
             candidate_response=strength.copy(),
         )
     if refine and len(points):
-        co = {k: spline_filter(v, order=3, mode="reflect") for k, v in derivatives.items()}
+        co = fields.coefficients
         for _ in range(6):
             d = {
                 k: map_coordinates(v, points.T, order=3, mode="reflect", prefilter=False)
@@ -228,7 +330,7 @@ def lines_gauss(
             "corrected_points": int(corrected),
             "halcon_parity": "not_verified",
             "dtype": "float64",
-            "mask_used": mask is not None,
+            "mask_used": mask_used,
             "intensity_rescaled": False,
             "profile_refined_points": int(
                 sum(np.count_nonzero(c.attributes.get("profile_fit_valid", [])) for c in contours)
