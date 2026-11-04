@@ -44,6 +44,19 @@ uv run --extra visualization steger detect roi.tif --mask neck_mask.png \
 
 添加 `--inspect-point ROW COL` 可检查距离指定位置最近的有效候选点。除了图片，报告还会将原始数组无损保存到 `process.npz`。Python 中先调用 `lines_gauss(..., return_trace=True)`，再调用 `steger.visualization` 中的 `save_process_report`。过程记录可选，已通过测试确认不会改变检测输出。详见[算法与过程说明（英文）](docs/steger-process.md)。
 
+## 批量分析原图与颈部 mask
+
+原始 8 位 PNG ROI 按 `sample.png` 命名，对应且对齐的 mask 按 `sample_mask.png` 命名：
+
+```bash
+uv run --extra visualization python tools/analyze_necks.py neck_mask \
+  --output reports/neck-analysis/results
+```
+
+本地输出包含可筛选的 `index.html`、全部角度 `angles.csv`、逐张测量叠加图、Hessian/法向/亚像素定位过程图、参数敏感性图，以及 `visualizations.zip`。脚本在五个明确记录的尺度下检查亮线和暗线，根据 mask 内覆盖范围及参考尺度选择中心线，选择过程不使用角度大小，并保存所有候选信息。若初次搜索覆盖或长度不足，则追加三个更大尺度；选中追加尺度的结果一律标记需复核，以检查平滑对细节的影响。测量的是可见颈部自身弯曲：沿同一行进方向，拟合 5–25% 与 75–95% 弧长窗口，直线为 0°。
+
+覆盖不足或过短时，主角度留空，只保留单独标记的局部段诊断角度。主角度衡量两端方向差，S 形反向弯折可能相互抵消；另附累计转角诊断值，但该值容易受局部定位波动影响。覆盖、长度与敏感性规则用于筛查，不能视为已验证的精度或置信区间。本批量策略关闭线宽偏差校正和额外原始灰度轮廓拟合，因为相关模型尚未在所提供的成像类型上验证。解释估计值前需检查 mask、中心线位置、图像截断与参数敏感性。默认真实数据目录中的原图和结果均排除在 Git 之外。
+
 ## 安装
 
 项目使用 uv 和 Python 3.12：

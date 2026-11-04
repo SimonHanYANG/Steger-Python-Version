@@ -44,6 +44,19 @@ uv run --extra visualization steger detect roi.tif --mask neck_mask.png \
 
 Add `--inspect-point ROW COL` to inspect the nearest located candidate. The report saves lossless arrays in `process.npz` as well as figures. In Python, use `lines_gauss(..., return_trace=True)` followed by `save_process_report` from `steger.visualization`. Recording is optional and tested to preserve detector outputs exactly. See [the algorithm and process guide](docs/steger-process.md).
 
+## Batch analysis of paired neck images
+
+For original 8-bit PNG ROIs named `sample.png` with aligned `sample_mask.png` files:
+
+```bash
+uv run --extra visualization python tools/analyze_necks.py neck_mask \
+  --output reports/neck-analysis/results
+```
+
+The local report includes a filterable `index.html`, `angles.csv`, individual measurement overlays, Hessian/normal/subpixel process reports, parameter sensitivity plots, and `visualizations.zip`. The script searches bright and dark ridges at five declared scales, selects by mask extent and a reference scale rather than angle, and records every candidate. If that search yields insufficient extent or length, it checks three larger scales; any selected larger scale requires review for smoothing effects. It measures the visible neck's self-bending using directed fits over the 5–25% and 75–95% arclength windows; straight is 0 degrees.
+
+Incomplete or short centerlines receive no full-neck angle: their local diagnostic angle is stored separately. The primary angle measures end-direction change; reverse bends in an S-shaped neck can cancel. A separate cumulative-turn diagnostic is exported, but it is sensitive to local localization fluctuations. Extent/length checks and sensitivity flags are screening rules, not validated accuracy or confidence bounds. Width bias correction and the additional original-profile fit are disabled in this batch policy because those models have not been validated for the supplied imaging modality. Review masks, centerline placement, crop boundaries, and sensitivity before interpreting estimates. Input images and reports in the default real-data folders are excluded from Git.
+
 ## Installation
 
 The project uses uv and Python 3.12:

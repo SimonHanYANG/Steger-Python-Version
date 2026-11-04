@@ -6,4 +6,8 @@ __pycache__/
 dist/
 reports/halcon/
 /An_unbiased_detector_of_curvilinear_structures.pdf
+.DS_Store
+/neck_mask/
+/neck_mask.zip
+/reports/neck-analysis/
 
