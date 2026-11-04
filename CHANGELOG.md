@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Python package 1.1.0.dev0
+
+- Add `measure_neck(roi, mask)` for resident-array adaptive angle measurement,
+  including the accepted v1.0 quality and sensitivity diagnostics.
+- Share per-scale ridge fields between polarities, restrict independent Hessian
+  eigenproblems to the mask when tracing is off, and reuse contours/angle fits.
+- Preserve float64, full scales/rescue, Newton rules, linking, selection and windows.
+- Add isolated v1.0 bitwise regression checks and interleaved worker benchmarks.
+- Keep the v1.0 stable release and tag unchanged.
+
 ## v1.0 — Python package 1.0.0
 
 First stable release. The project owner reviewed the current real-image results,

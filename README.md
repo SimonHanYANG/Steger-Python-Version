@@ -4,6 +4,11 @@
 
 **Stable release: [v1.0](https://github.com/SimonHanYANG/Steger-Python-Version/releases/tag/v1.0)** · Python package `1.0.0` · [Release notes](docs/releases/v1.0.md)
 
+**Development branch:** `perf/angle-worker-v1.0` (`1.1.0.dev0`) adds a faster
+`measure_neck(roi, mask)` worker while preserving the v1.0 measurement policy.
+See [runtime and exact-output comparisons](reports/performance/README.md) and
+[API / reproduction notes](docs/performance.md).
+
 A precision-oriented Python implementation of Steger's curvilinear structure detector. It processes grayscale regions of interest (ROIs) and uses segmentation masks to select target structures. No HALCON installation or graphical interface is required.
 
 The implementation follows the Gaussian derivatives, Hessian-based subpixel localization, directional linking, width estimation, and asymmetry bias correction described by Steger (1998). Its parameters and output attributes reference the official HALCON `lines_gauss` documentation.
@@ -88,6 +93,21 @@ Runtime dependencies are NumPy, SciPy, and Pillow. Development checks additional
 
 ## Python API
 
+For the adaptive neck policy used by the real-image batch, pass resident arrays
+directly; no visualization dependency is needed:
+
+```python
+from steger import measure_neck
+
+result = measure_neck(roi, mask)
+print(result["angle_deg"], result["status"])
+```
+
+An insufficient or missing segment returns `angle_deg=None`. Detected segments
+also include fit, sensitivity and quality diagnostics. See [the worker API](docs/performance.md).
+
+For general detector parameters and a confirmed single contour:
+
 ```python
 from steger import lines_gauss, measure_bending
 from steger.io import read_image, write_json
@@ -135,7 +155,7 @@ uv run steger detect roi.tif --mask neck_mask.png \
   --no-complete-junctions --measure-neck --output neck.json --overlay neck.png
 ```
 
-Inputs include Pillow-readable images such as PNG/TIFF and `.npy` arrays. RGB images are explicitly converted to luminance by the I/O layer; the core API accepts single-channel images only. The original intensity range is preserved for 16-bit and floating-point grayscale inputs. Masks must match the ROI's dimensions and coordinates; no automatic resizing or registration is performed.
+Inputs include Pillow-readable images such as PNG/TIFF and `.npy` arrays. RGB images are explicitly converted to luminance by the I/O layer; the `lines_gauss` API accepts single-channel images only; `measure_neck` also accepts RGB(A) arrays. The original intensity range is preserved for 16-bit and floating-point grayscale inputs. Masks must match the ROI's dimensions and coordinates; no automatic resizing or registration is performed.
 
 **The mask limits candidate centerline locations without setting the original image outside the mask to black.** Convolution and profile fitting retain the surrounding grayscale data to avoid artificial boundaries affecting subpixel measurements. Contrast adjustment in overlays is for display only.
 

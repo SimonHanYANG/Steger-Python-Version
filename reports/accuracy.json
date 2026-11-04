@@ -1,13 +1,13 @@
 {
-  "implementation_version": "1.0.0",
-  "implementation_source_sha256": "a60f63561a55e10b75b3c0d88bea0faf05c1d973e50eacd887937f930c0afab8",
+  "implementation_version": "1.1.0.dev0",
+  "implementation_source_sha256": "6b4f4b7b031c1a3dee2c259ad588cede38ccbd1b528dda0b5fdb1c380e536bda",
   "python": "3.12.13",
   "numpy": "2.5.4",
   "platform": "macOS-13.0.1-arm64-arm-64bit",
   "seed": 20261104,
   "halcon_comparison": "NOT RUN: native licensed reference unavailable",
   "truth": "continuous geometric centerline; independent pixel-area image integration",
-  "scope": "specified synthetic profile models only; no real sperm ROI/mask provided",
+  "scope": "specified synthetic profile models only; real-image output equivalence is evaluated separately",
   "cases": [
     {
       "case": {
@@ -19,7 +19,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 1.062027000123635,
+      "seconds": 0.5842204159125686,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -56,7 +56,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 1.1900536671746522,
+      "seconds": 0.582702707964927,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -93,7 +93,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 1.9993369998410344,
+      "seconds": 1.5075371249113232,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -130,7 +130,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 1.843274500221014,
+      "seconds": 1.5293538752011955,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -167,7 +167,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 2.137950624804944,
+      "seconds": 1.6612484171055257,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -204,7 +204,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 2.2534777908585966,
+      "seconds": 1.6401225000154227,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -241,7 +241,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 0.7326900828629732,
+      "seconds": 0.6514674159698188,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -278,7 +278,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 0.6670999580528587,
+      "seconds": 0.582628957927227,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -315,7 +315,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 0.6667015419807285,
+      "seconds": 0.5818837920669466,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -352,7 +352,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 0.6115932499524206,
+      "seconds": 0.5554842499550432,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -389,7 +389,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 2.621535209007561,
+      "seconds": 1.5021185418590903,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -426,7 +426,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 1.6691528339870274,
+      "seconds": 1.432042707921937,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -463,7 +463,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 2.1584655828773975,
+      "seconds": 1.6908122499007732,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -500,7 +500,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 1.9263019999489188,
+      "seconds": 1.5511177089065313,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -537,7 +537,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 0.6511469578836113,
+      "seconds": 0.556422958150506,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -574,7 +574,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 0.8448300419840962,
+      "seconds": 0.5870034999679774,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -611,7 +611,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 0.503715791972354,
+      "seconds": 0.4148161660414189,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -648,7 +648,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 0.535853625042364,
+      "seconds": 0.47587008285336196,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -685,7 +685,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 1.644633665913716,
+      "seconds": 1.3582780840806663,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -722,7 +722,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 1.870042041875422,
+      "seconds": 1.3736862919759005,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -759,7 +759,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 1.7367053751368076,
+      "seconds": 2.7703797498252243,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -796,7 +796,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 2.024118874920532,
+      "seconds": 2.617196584120393,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -833,7 +833,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 0.4732023330871016,
+      "seconds": 0.5275736670009792,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -870,7 +870,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 0.6008527078665793,
+      "seconds": 0.7017459578346461,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -911,7 +911,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 3.261231957934797,
+      "seconds": 3.030506500042975,
       "contours": 2,
       "success": true,
       "position_px": {
@@ -952,7 +952,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 2.537961166817695,
+      "seconds": 3.0846306250896305,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -993,7 +993,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 17.043247333960608,
+      "seconds": 18.287129207979888,
       "contours": 30,
       "success": true,
       "position_px": {
@@ -1034,7 +1034,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 5.320502958027646,
+      "seconds": 4.381354458164424,
       "contours": 6,
       "success": true,
       "position_px": {
@@ -1071,7 +1071,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 0.5291752500925213,
+      "seconds": 0.51115941721946,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1108,7 +1108,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 0.5306725839618593,
+      "seconds": 0.5204266658984125,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1145,7 +1145,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 2.0459792921319604,
+      "seconds": 1.979307458968833,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1182,7 +1182,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 2.2139865001663566,
+      "seconds": 2.148975625168532,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1219,7 +1219,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 2.3281165410298854,
+      "seconds": 2.180085083004087,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1256,7 +1256,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 2.498884624801576,
+      "seconds": 2.35273279203102,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1293,7 +1293,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 0.5301802922040224,
+      "seconds": 0.5127821669448167,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1330,7 +1330,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 0.5529525419697165,
+      "seconds": 0.5847205419559032,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1367,7 +1367,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 0.44516787491738796,
+      "seconds": 0.4371350419241935,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1404,7 +1404,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 0.5153057081624866,
+      "seconds": 0.48936000000685453,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1441,7 +1441,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 1.7262893749866635,
+      "seconds": 1.6232049579266459,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1478,7 +1478,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 2.2897883330006152,
+      "seconds": 2.155243249842897,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1515,7 +1515,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 1.8347381248604506,
+      "seconds": 1.7821228329557925,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1552,7 +1552,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 2.458788709016517,
+      "seconds": 2.3766126248519868,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1589,7 +1589,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 0.45521816704422235,
+      "seconds": 0.4428173329215497,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1626,7 +1626,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 0.5597780419047922,
+      "seconds": 0.5424616250675172,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1663,7 +1663,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 0.44904191605746746,
+      "seconds": 0.43766462500207126,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1700,7 +1700,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 0.5132279579993337,
+      "seconds": 0.5017043747939169,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1737,7 +1737,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 1.430405749939382,
+      "seconds": 2.3135266669560224,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1774,7 +1774,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 1.9916433750186116,
+      "seconds": 3.1473725421819836,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1811,7 +1811,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 1.5353340420406312,
+      "seconds": 2.1057975420262665,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1848,7 +1848,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 2.17284591589123,
+      "seconds": 2.226303917123005,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1885,7 +1885,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 0.44355216692201793,
+      "seconds": 0.7037499591242522,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1922,7 +1922,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 0.6364757919218391,
+      "seconds": 0.5887430000584573,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -1963,7 +1963,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 3.589876708108932,
+      "seconds": 3.528365375008434,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2004,7 +2004,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 3.070862833177671,
+      "seconds": 3.6210241250228137,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2045,7 +2045,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 13.154531958978623,
+      "seconds": 14.177413000026718,
       "contours": 29,
       "success": true,
       "position_px": {
@@ -2086,7 +2086,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 5.286200583912432,
+      "seconds": 5.609211000148207,
       "contours": 6,
       "success": true,
       "position_px": {
@@ -2123,7 +2123,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 1.001996957929805,
+      "seconds": 1.0157661668490618,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2160,7 +2160,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 1.0726462081074715,
+      "seconds": 1.245707832975313,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2197,7 +2197,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 3.6510154160205275,
+      "seconds": 3.872441084124148,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2234,7 +2234,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 4.554571209009737,
+      "seconds": 6.87048254115507,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2271,7 +2271,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 3.8809304588939995,
+      "seconds": 4.319734458113089,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2308,7 +2308,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 5.117257375037298,
+      "seconds": 5.290600792039186,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2345,7 +2345,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 1.0239103341009468,
+      "seconds": 1.194366917014122,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2382,7 +2382,7 @@
         "quadrature": 32
       },
       "sigma": 1.1,
-      "seconds": 1.0183140421286225,
+      "seconds": 1.4028871660120785,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2419,7 +2419,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 1.2841094580944628,
+      "seconds": 0.8594999159686267,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2456,7 +2456,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 1.6320083749014884,
+      "seconds": 0.9750603749416769,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2493,7 +2493,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 3.5305288329254836,
+      "seconds": 3.835127499885857,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2530,7 +2530,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 4.330752459121868,
+      "seconds": 4.780476083047688,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2567,7 +2567,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 3.7487356250640005,
+      "seconds": 4.226989042013884,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2604,7 +2604,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 4.990184833062813,
+      "seconds": 5.502498083980754,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2641,7 +2641,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 0.8209941659588367,
+      "seconds": 0.8268842080142349,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2678,7 +2678,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 0.9027773749548942,
+      "seconds": 0.9602519159670919,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2715,7 +2715,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 0.6607881251256913,
+      "seconds": 0.7089925000909716,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2752,7 +2752,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 0.6438072910532355,
+      "seconds": 1.6508315841201693,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2789,7 +2789,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 2.813947750022635,
+      "seconds": 3.909387582913041,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2826,7 +2826,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 3.7910924998577684,
+      "seconds": 4.567397290840745,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2863,7 +2863,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 3.258941583801061,
+      "seconds": 3.9758947920054197,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2900,7 +2900,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 4.243769749999046,
+      "seconds": 4.83161333296448,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2937,7 +2937,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 0.6591909590642899,
+      "seconds": 0.8630685831885785,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -2974,7 +2974,7 @@
         "quadrature": 32
       },
       "sigma": 1.8433756729740645,
-      "seconds": 0.6846046668943018,
+      "seconds": 0.7591700828634202,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -3015,7 +3015,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 7.574491833103821,
+      "seconds": 5.814779999898747,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -3056,7 +3056,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 8.206713291816413,
+      "seconds": 5.965718500083312,
       "contours": 1,
       "success": true,
       "position_px": {
@@ -3097,7 +3097,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 28.615646416088566,
+      "seconds": 26.902868583099917,
       "contours": 29,
       "success": true,
       "position_px": {
@@ -3138,7 +3138,7 @@
         "quadrature": 32
       },
       "sigma": 1.2660254037844387,
-      "seconds": 9.34640504210256,
+      "seconds": 12.860428291838616,
       "contours": 6,
       "success": true,
       "position_px": {
@@ -3201,7 +3201,7 @@
     },
     "passed": true
   },
-  "elapsed_seconds": 233.3296326249838,
+  "elapsed_seconds": 239.8506336249411,
   "passed_cases": 84,
   "total_cases": 84,
   "all_passed": true

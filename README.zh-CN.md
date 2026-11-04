@@ -4,6 +4,10 @@
 
 **稳定版：[v1.0](https://github.com/SimonHanYANG/Steger-Python-Version/releases/tag/v1.0)** · Python 包版本 `1.0.0` · [发布说明（英文）](docs/releases/v1.0.md)
 
+**性能开发分支：**`perf/angle-worker-v1.0`（`1.1.0.dev0`）新增直接接收数组的
+`measure_neck(roi, mask)`，复用中间计算并保留 v1.0 的测量规则。
+参见[耗时和逐位一致性结果](reports/performance/README.md)及[接口与复现说明](docs/performance.md)。
+
 以定位和测量精度为优先的 Python Steger 曲线提取实现，可直接处理灰度 ROI，并用分割 mask 筛选目标。不需要 HALCON、不提供 UI。
 
 基于 Steger 1998 年论文的高斯导数、Hessian 亚像素定位、方向连接、线宽估计和不对称偏差校正；参照 HALCON `lines_gauss` 官方文档提供参数和属性。
@@ -88,6 +92,21 @@ uv run steger --help
 
 ## 直接在 Python 中调用
 
+使用与真实图像批处理相同的自动搜索策略时，可将分割线程得到的数组直接传入：
+
+```python
+from steger import measure_neck
+
+result = measure_neck(roi, mask)
+print(result["angle_deg"], result["status"])
+```
+
+该接口不读图、不绘图，不依赖 matplotlib；保留完整尺度搜索及质量检查。
+片段不足或过短时 `angle_deg` 为 `None`，检测到的片段同时返回拟合与敏感性诊断。
+详细接口见[线程测量与复现说明（英文）](docs/performance.md)。
+
+需要自行指定一般检测参数时：
+
 ```python
 from steger import lines_gauss, measure_bending
 from steger.io import read_image, write_json
@@ -134,7 +153,7 @@ uv run steger detect roi.tif --mask neck_mask.png \
   --no-complete-junctions --measure-neck --output neck.json --overlay neck.png
 ```
 
-输入支持 PNG/TIFF 等 Pillow 可读图像及 `.npy` 数组；RGB 图像在 I/O 层显式转为亮度，核心接口仅接受单通道图像。16 位和浮点灰度输入保留其原始数值范围。mask 必须与 ROI 尺寸和坐标一致；不进行自动拉伸或配准。
+输入支持 PNG/TIFF 等 Pillow 可读图像及 `.npy` 数组；RGB 图像在 I/O 层显式转为亮度，`lines_gauss` 仅接受单通道图像，`measure_neck` 也接受 RGB(A) 数组。16 位和浮点灰度输入保留其原始数值范围。mask 必须与 ROI 尺寸和坐标一致；不进行自动拉伸或配准。
 
 **mask 只限制候选中心线的位置，不把 mask 外的原图设为黑色。**卷积和截面拟合保留周围真实灰度，避免人为边界影响亚像素测量。叠加图的对比度调整只用于显示。
 

@@ -24,18 +24,26 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+import analyze_necks as current_batch
 import numpy as np
 import scipy
+from benchmark_roi_worker import compute_from_arrays
 from PIL import Image
 
-import analyze_necks as current_batch
-from benchmark_roi_worker import compute_from_arrays
 from steger import lines_gauss, measure_bending
 from steger.io import read_image, write_json
 from steger.synthetic import circular_line, straight_line
 
 ROOT = Path(__file__).resolve().parents[1]
-REFERENCE_COMMIT = "93a481e"
+REFERENCE_COMMIT = "93a481e62f25b853d6dd8c40b62e910100facec6"
+
+
+def source_sha256():
+    digest = hashlib.sha256()
+    for path in sorted((ROOT / "src/steger").glob("*.py")):
+        digest.update(path.name.encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
 
 
 @contextmanager
@@ -84,9 +92,9 @@ def reference_modules():
 def assert_exact(a, b, path="output"):
     """Reject numerical differences, including signed-zero and array bit changes."""
     if dataclasses.is_dataclass(a):
-        assert [f.name for f in dataclasses.fields(a)] == [
-            f.name for f in dataclasses.fields(b)
-        ], path
+        assert [f.name for f in dataclasses.fields(a)] == [f.name for f in dataclasses.fields(b)], (
+            path
+        )
         for f in dataclasses.fields(a):
             assert_exact(getattr(a, f.name), getattr(b, f.name), f"{path}.{f.name}")
     elif isinstance(a, np.ndarray):
@@ -163,9 +171,20 @@ def synthetic_parity(reference):
             for s in (0, 0.5)
         ]
         cases += [
-            dict(model=model, half_width=1.5, angle_deg=37, offset=-0.319, asymmetry=0.35,
-                 noise=n, polarity=p, quantize=True, seed=20261104, quadrature=32)
-            for n in (1, 3) for p in ("light", "dark")
+            dict(
+                model=model,
+                half_width=1.5,
+                angle_deg=37,
+                offset=-0.319,
+                asymmetry=0.35,
+                noise=n,
+                polarity=p,
+                quantize=True,
+                seed=20261104,
+                quadrature=32,
+            )
+            for n in (1, 3)
+            for p in ("light", "dark")
         ]
         for case in cases:
             image, _ = straight_line(shape=(72, 72), **case)
@@ -173,23 +192,33 @@ def synthetic_parity(reference):
             args = (image, sigma, 0.4, 1.2, case.get("polarity", "light"), True, model, False)
             assert_exact(reference.lines_gauss(*args), lines_gauss(*args), f"synthetic[{count}]")
             count += 1
+            if count % 12 == 0:
+                print(f"Synthetic bitwise comparisons passed: {count}/84", flush=True)
     image, gt = circular_line(shape=(112, 112), radius=30)
     rr, cc = np.indices(image.shape)
     center = gt["center"]
     theta = np.arctan2(rr - center[0], cc - center[1])
-    mask = (theta > 0.2) & (theta < 1.8) & (abs(np.hypot(rr-center[0], cc-center[1])-30) < 3)
+    mask = (theta > 0.2) & (theta < 1.8) & (abs(np.hypot(rr - center[0], cc - center[1]) - 30) < 3)
     args = (image, 1.5, 0.4, 1.2, "light", True, "gaussian", False)
     old, new = reference.lines_gauss(*args, mask=mask), lines_gauss(*args, mask=mask)
     assert_exact(old, new, "circle")
-    assert_exact(reference.measure_bending(max(old.contours, key=lambda c: c.length)),
-                 measure_bending(max(new.contours, key=lambda c: c.length)), "circle.angle")
+    assert_exact(
+        reference.measure_bending(max(old.contours, key=lambda c: c.length)),
+        measure_bending(max(new.contours, key=lambda c: c.length)),
+        "circle.angle",
+    )
     return dict(straight_cases=count, circles=1)
 
 
 def stats(values):
     a = np.asarray(values)
-    return dict(calls=len(a), mean_ms=float(a.mean()), median_ms=float(np.median(a)),
-                p95_ms=float(np.percentile(a, 95)), max_ms=float(a.max()))
+    return dict(
+        calls=len(a),
+        mean_ms=float(a.mean()),
+        median_ms=float(np.median(a)),
+        p95_ms=float(np.percentile(a, 95)),
+        max_ms=float(a.max()),
+    )
 
 
 def timed(function, roi, mask):
@@ -205,9 +234,17 @@ def profile(function, cases):
         function(roi, mask)
     profiler.disable()
     rows = []
-    for (filename, line, name), (_, calls, own, cumulative, _) in pstats.Stats(profiler).stats.items():
-        rows.append(dict(function=f"{Path(filename).name}:{line}:{name}", calls=calls,
-                         own_seconds=own, cumulative_seconds=cumulative))
+    for (filename, line, name), (_, calls, own, cumulative, _) in pstats.Stats(
+        profiler
+    ).stats.items():
+        rows.append(
+            dict(
+                function=f"{Path(filename).name}:{line}:{name}",
+                calls=calls,
+                own_seconds=own,
+                cumulative_seconds=cumulative,
+            )
+        )
     return sorted(rows, key=lambda r: -r["cumulative_seconds"])[:25]
 
 
@@ -217,11 +254,16 @@ def main():
     parser.add_argument("--pair", nargs=2, action="append", default=[], metavar=("ROI", "MASK"))
     parser.add_argument("--rounds", type=int, default=20)
     parser.add_argument("--synthetic", action="store_true")
-    parser.add_argument("--output", type=Path,
-                        default=Path("reports/neck-analysis/performance/optimization.json"))
+    parser.add_argument("--cold-only", choices=("v1.0", "optimized"), help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--output", type=Path, default=Path("reports/neck-analysis/performance/optimization.json")
+    )
     args = parser.parse_args()
+    if not __debug__:
+        parser.error("Run without -O: exact parity assertions are required")
     if args.rounds < 1:
         parser.error("--rounds must be positive")
+    source_at_start = source_sha256()
     paths = current_batch.image_pairs(args.input_dir) if args.input_dir else []
     paths += [(Path(a), Path(b)) for a, b in args.pair]
     cases = []
@@ -233,6 +275,16 @@ def main():
             digest.update(array.tobytes())
         cases.append((a.stem, roi, mask, read_image(a), read_image(b, mask=True)))
     with reference_modules() as (reference, batch, worker, commit):
+        if args.cold_only:
+            function = (
+                worker.compute_from_arrays if args.cold_only == "v1.0" else compute_from_arrays
+            )
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                output, elapsed = executor.submit(
+                    timed, function, cases[0][1], cases[0][2]
+                ).result()
+            print(json.dumps({"processing_ms": elapsed, "output": output}))
+            return
         print("Checking real outputs, every search candidate, and full traces...", flush=True)
         parity = real_parity(batch, worker, cases)
         if args.synthetic:
@@ -247,7 +299,9 @@ def main():
         with ThreadPoolExecutor(max_workers=1) as executor:
             cold = {}
             for name, function in functions.items():
-                output, elapsed = executor.submit(timed, function, cases[0][1], cases[0][2]).result()
+                output, elapsed = executor.submit(
+                    timed, function, cases[0][1], cases[0][2]
+                ).result()
                 cold[name] = elapsed  # first worker call after parity; NOT process cold start
                 for identifier, roi, mask, *_ in cases:
                     output, _ = executor.submit(timed, function, roi, mask).result()
@@ -256,27 +310,53 @@ def main():
                 for index in rng.permutation(len(cases)):
                     identifier, roi, mask, *_ = cases[index]
                     for name in rng.permutation(list(functions)):
-                        output, elapsed = executor.submit(timed, functions[name], roi, mask).result()
+                        output, elapsed = executor.submit(
+                            timed, functions[name], roi, mask
+                        ).result()
                         assert_exact(outputs[name, identifier], output, identifier + ".repeat")
                         samples[name].append(elapsed)
                         per_image[name][identifier].append(elapsed)
-        source = hashlib.sha256()
-        for path in sorted((ROOT / "src/steger").glob("*.py")):
-            source.update(path.name.encode())
-            source.update(path.read_bytes())
+        if source_sha256() != source_at_start:
+            raise RuntimeError("Source changed during validation; rerun on an unchanged tree")
         stages = {name: stats(values) for name, values in samples.items()}
+        cold_process = {}
+        for name in functions:
+            command = [
+                sys.executable,
+                str(Path(__file__).resolve()),
+                "--input-dir",
+                str(args.input_dir),
+                "--cold-only",
+                name,
+            ]
+            cold_process[name] = json.loads(subprocess.check_output(command, cwd=ROOT, text=True))
         report = dict(
-            measured_utc=datetime.now(timezone.utc).isoformat(), reference_commit=commit,
-            implementation_source_sha256=source.hexdigest(), dataset_sha256=digest.hexdigest(),
-            environment=dict(platform=platform.platform(), python=platform.python_version(),
-                             numpy=np.__version__, scipy=scipy.__version__),
+            measured_utc=datetime.now(timezone.utc).isoformat(),
+            reference_commit=commit,
+            implementation_source_sha256=source_at_start,
+            dataset_sha256=digest.hexdigest(),
+            environment=dict(
+                platform=platform.platform(),
+                python=platform.python_version(),
+                numpy=np.__version__,
+                scipy=scipy.__version__,
+            ),
             scope="Raw resident ROI/mask to angle+status; full adaptive search/rescue and quality checks; one persistent worker; interleaved randomized calls; no I/O, plots, queue wait or concurrent segmentation; warmed timings, not process startup",
-            rounds=args.rounds, parity=parity, bitwise_exact=True,
-            images_returning_angle=sum(outputs["optimized", c[0]]["angle_deg"] is not None for c in cases),
-            stages=stages, speedup=stages["v1.0"]["mean_ms"] / stages["optimized"]["mean_ms"],
+            rounds=args.rounds,
+            parity=parity,
+            bitwise_exact=True,
+            images_returning_angle=sum(
+                outputs["optimized", c[0]]["angle_deg"] is not None for c in cases
+            ),
+            stages=stages,
+            samples_ms=samples,
+            speedup=stages["v1.0"]["mean_ms"] / stages["optimized"]["mean_ms"],
             first_worker_call_after_parity_ms=cold,
-            per_image={name: {key: {**stats(v), **outputs[name, key]} for key, v in group.items()}
-                       for name, group in per_image.items()},
+            first_call_fresh_process=cold_process,
+            per_image={
+                name: {key: {**stats(v), **outputs[name, key]} for key, v in group.items()}
+                for name, group in per_image.items()
+            },
             profiles={name: profile(f, cases) for name, f in functions.items()},
         )
         write_json(args.output, report)
