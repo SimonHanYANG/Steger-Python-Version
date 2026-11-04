@@ -8,6 +8,10 @@
 参见[耗时和逐位一致性结果](reports/performance/README.md)及[接口与复现说明](docs/performance.md)。
 发布标签直接来自 `perf/angle-worker-v1.0` 分支，`main` 保持不变。
 
+**进一步加速分支：**`perf/angle-worker-v1.0.1`（`1.0.2.dev0`）优化点连接开销，
+并用紧凑的 mask 像素数组完成 Taylor 定位。保留 v1.0.1 的输出逐位对照。
+参见[同轮耗时对照](reports/performance-followup/README.md)和[实现及复现说明](docs/performance-followup.md)。
+
 以定位和测量精度为优先的 Python Steger 曲线提取实现，可直接处理灰度 ROI，并用分割 mask 筛选目标。不需要 HALCON、不提供 UI。
 
 基于 Steger 1998 年论文的高斯导数、Hessian 亚像素定位、方向连接、线宽估计和不对称偏差校正；参照 HALCON `lines_gauss` 官方文档提供参数和属性。

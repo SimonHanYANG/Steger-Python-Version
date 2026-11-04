@@ -16,6 +16,7 @@ def aggregate(report):
     keys = (
         "measured_utc",
         "reference_commit",
+        "reference_label",
         "implementation_source_sha256",
         "dataset_sha256",
         "environment",
@@ -71,6 +72,32 @@ def main():
             f"{values['median_ms']:.3f} | {values['p95_ms']:.3f} | {values['max_ms']:.3f} |"
         )
     parity = report["parity"]
+    label = report.get("reference_label", "v1.0")
+    followup = label == "v1.0.1"
+    guide = "performance-followup.md" if followup else "performance.md"
+    maximum_relation = (
+        "exceeds"
+        if report["stages"]["optimized"]["max_ms"] > report["stages"][label]["max_ms"]
+        else "is below"
+    )
+    changes = (
+        [
+            "- Batch duplicate-neighbor queries for short necks, reuse each edge's norm/dot geometry "
+            "for the two traversal directions, and preserve score ties and graph traversal order.",
+            "- Use the original unit-spacing gradient formulas for normal orientation without general "
+            "N-D dispatch; retain the same norm/dot/arccos linking arithmetic and thresholds.",
+            "- Keep Taylor localization and candidate filtering in compact mask-selected arrays when "
+            "trace capture is off. Full-ROI convolution, spline interpolation and full trace maps remain.",
+        ]
+        if followup
+        else [
+            "- Share full-ROI Gaussian derivatives, Hessian results, Taylor offsets and lazy cubic "
+            "spline coefficients between dark and light detection at each scale.",
+            "- Solve independent Hessian eigenproblems only inside the candidate mask when trace "
+            "capture is off; retain full-ROI convolution/interpolation and original trace fields.",
+            "- Retain the search contour and identical fits instead of rerunning detection and fits.",
+        ]
+    )
     lines = [
         "# ROI/mask worker optimization",
         "",
@@ -90,8 +117,8 @@ def main():
         "machine and dataset, not a latency guarantee for other images or concurrent workloads. "
         "Profiling was performed separately, outside the reported timing samples.",
         "",
-        "Occasional long calls remain in both versions. The optimized maximum exceeds "
-        "the reference maximum in this run; the cause of those individual stalls has "
+        f"The optimized maximum {maximum_relation} the reference maximum in this run. "
+        "The cause of individual latency fluctuations has "
         "not been isolated. Every sample is retained, without trimming or capping. "
         "This worker does not provide a hard real-time latency bound.",
         "",
@@ -99,7 +126,7 @@ def main():
         "",
         "## Numerical equivalence",
         "",
-        f"Reference commit: `{report['reference_commit']}` (accepted v1.0). "
+        f"Reference commit: `{report['reference_commit']}` (accepted {label}). "
         "The tool loads its source from immutable Git objects under a separate package name.",
         "",
         f"Bitwise comparisons passed for {parity['images']} real inputs, "
@@ -111,7 +138,7 @@ def main():
         f"Synthetic full-detector comparisons: {parity.get('straight_cases', 'not run')} "
         f"straight cases; {parity.get('circles', 'not run')} circle. Ground-truth acceptance "
         "is recorded separately in [the accuracy report](../accuracy-summary.md). "
-        "Equivalence to v1.0 on tested inputs is distinct from real-image ground-truth accuracy.",
+        f"Equivalence to {label} on tested inputs is distinct from real-image ground-truth accuracy.",
         "",
         f"Source SHA-256: `{report['implementation_source_sha256']}`.",
         "",
@@ -119,16 +146,10 @@ def main():
         "",
         "## What changed",
         "",
-        "- Share full-ROI Gaussian derivatives, Hessian results, Taylor offsets and lazy "
-        "cubic spline coefficients between dark and light detection at each scale.",
-        "- Solve independent 2×2 Hessian eigenproblems only inside the candidate mask "
-        "when trace capture is off. Convolution and interpolation still use the entire "
-        "original ROI; trace mode retains the full original fields.",
-        "- Retain the search contour instead of running the winning detector again. "
-        "Reuse identical angle fits while retaining length validation and sensitivity checks.",
+        *changes,
         "",
         "Float64, all five search scales, all three rescue scales, both polarities, "
-        "Newton iteration rules, linking, selection rules, end windows and quality gates "
+        "Newton iteration rules, linking decisions, selection rules, end windows and quality gates "
         "are preserved. No new runtime dependency or compiled extension was introduced.",
         "",
         "## First-call check",
@@ -143,15 +164,15 @@ def main():
         ],
         "",
         "The raw [aggregate JSON](optimization.json) retains environment details and "
-        "separate profiler summaries. See [reproduction and API notes](../../docs/performance.md).",
+        f"separate profiler summaries. See [reproduction and API notes](../../docs/{guide}).",
     ]
     if repeat is not None:
         lines += [
             "",
             "## Independent repeat",
             "",
-            "A fresh process repeated the same real-input parity checks and timing after "
-            "the long outliers above were observed. Source, dataset, environment and returned-angle "
+            "A fresh process repeated the same real-input parity checks and timing. "
+            "Source, dataset, environment and returned-angle "
             "count match the primary run. Synthetic comparisons are recorded in the primary run. "
             "The repeat does not replace or remove primary-run samples.",
             "",

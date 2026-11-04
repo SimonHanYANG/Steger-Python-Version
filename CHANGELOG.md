@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased — Python package 1.0.2.dev0
+
+- Optimize duplicate queries and repeated neighbor geometry in the linker, preserving
+  thresholds, score ties, topology and traversal order.
+- Use the original unit-spacing gradient formulas for normal orientation.
+- Keep masked Taylor fields compact without cropping convolution/interpolation.
+- Add 28 frozen v1.0.1 boundary, topology, response-priority and dtype/layout checks.
+- Record paired v1.0.1 timing runs and bitwise real/synthetic output comparisons.
+- Keep this work on `perf/angle-worker-v1.0.1`; main and stable tags remain unchanged.
+
 ## v1.0.1 — Python package 1.0.1
 
 - Add `measure_neck(roi, mask)` for resident-array adaptive angle measurement,

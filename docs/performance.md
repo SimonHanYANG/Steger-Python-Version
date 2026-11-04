@@ -2,6 +2,8 @@
 
 [English README](../README.md) · [中文 README](../README.zh-CN.md)
 
+For work after v1.0.1, see [the further optimization guide](performance-followup.md).
+
 Release `v1.0.1` (package `1.0.1`) publishes the accepted optimization from
 `perf/angle-worker-v1.0`. It is tagged directly from that branch, with `main`
 unchanged. The v1.0 tag remains the numerical reference. [Runtime and numerical comparisons](../reports/performance/README.md)

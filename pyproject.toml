@@ -31,7 +31,7 @@ include = [
   "src/steger", "tools", "tests", "docs", "README.md", "README.zh-CN.md",
   "CHANGELOG.md", "pyproject.toml", "uv.lock", ".python-version",
   "reports/accuracy.json", "reports/accuracy-summary.md", "reports/noise-validation.png",
-  "reports/examples", "reports/visualizations", "reports/process", "reports/performance",
+  "reports/examples", "reports/visualizations", "reports/process", "reports/performance", "reports/performance-followup",
 ]
 
 [tool.pytest.ini_options]
