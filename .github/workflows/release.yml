@@ -50,9 +50,9 @@ jobs:
           with open(os.environ["GITHUB_ENV"], "a") as stream:
               stream.write("RELEASE_TAG=" + tag + "\n")
           PY
-          git checkout "$RELEASE_TAG"
       - name: Verify tagged version
         run: |
+          git checkout "$RELEASE_TAG"
           uv run --frozen --extra dev python - <<'PY'
           import os
           import tomllib
