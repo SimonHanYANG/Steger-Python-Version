@@ -65,6 +65,14 @@ uv run --extra visualization python tools/benchmark_neck_runtime.py
 
 The benchmark verifies saved angles and statuses, warms the functions, and separately measures angle calculation from resident contours, one fixed-parameter ROI-to-angle run, and the automatic search with quality checks. It exports mean/median/P95 timings, per-image summaries, raw timing samples, and machine/library details to `reports/neck-analysis/runtime/`. Diagnostic-only images are excluded from the angle-only statistics. These timings depend on the machine and input data.
 
+For the deployment boundary where a persistent angle worker receives only raw in-memory ROI and mask arrays, run:
+
+```bash
+uv run --extra visualization python tools/benchmark_roi_worker.py
+```
+
+This includes RGB conversion, mask processing, Steger extraction, contour selection, and angle calculation inside one worker thread. The adaptive mode reproduces the batch quality/search behavior without cached per-image parameters or contour indices. A separate fixed-global-scale mode reports speed, returned-angle counts, and differences from the adaptive results. Processing time and submit-to-result latency are reported separately in `reports/neck-analysis/worker-runtime/`; segmentation and simultaneous segmentation load are excluded.
+
 ## Installation
 
 The project uses uv and Python 3.12:

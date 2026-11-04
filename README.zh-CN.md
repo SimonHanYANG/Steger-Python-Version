@@ -65,6 +65,14 @@ uv run --extra visualization python tools/benchmark_neck_runtime.py
 
 基准脚本先核对已有角度与状态并预热函数，分别测量“内存中心线→角度”“固定参数的内存 ROI→角度”和“自动选参与质量检查”。输出平均值、中位数、P95、逐图统计、原始计时样本和机器/依赖信息到 `reports/neck-analysis/runtime/`。仅有诊断值的图像不纳入纯角度耗时统计。运行时间取决于机器和输入数据。
 
+若要测试实际部署入口，即常驻角度线程每次仅接收内存中的原始 ROI 和 mask 数组：
+
+```bash
+uv run --extra visualization python tools/benchmark_roi_worker.py
+```
+
+该测试将 RGB 转灰度、mask 处理、Steger 提取、中心线选择和角度计算全部纳入一个工作线程的计时。自动模式复现批处理的搜索及质量判断，每张图不使用预先保存的参数或曲线索引。另测固定全局尺度模式，同时报告速度、返回角度的样本数及与自动结果的差异。处理时间与线程提交至返回的时延分别保存在 `reports/neck-analysis/worker-runtime/`；分割计算及与分割同时运行时的负载竞争未计入。
+
 ## 安装
 
 项目使用 uv 和 Python 3.12：
