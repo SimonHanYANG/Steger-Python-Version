@@ -2,15 +2,17 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
+**Stable release: [v1.0](https://github.com/SimonHanYANG/Steger-Python-Version/releases/tag/v1.0)** · Python package `1.0.0` · [Release notes](docs/releases/v1.0.md)
+
 A precision-oriented Python implementation of Steger's curvilinear structure detector. It processes grayscale regions of interest (ROIs) and uses segmentation masks to select target structures. No HALCON installation or graphical interface is required.
 
 The implementation follows the Gaussian derivatives, Hessian-based subpixel localization, directional linking, width estimation, and asymmetry bias correction described by Steger (1998). Its parameters and output attributes reference the official HALCON `lines_gauss` documentation.
 
-**Accuracy scope:** This is an independent implementation, not a wrapper around HALCON's native libraries. An additional fit to the original grayscale profile is enabled by default to reduce pixel sampling error. Synthetic ground-truth validation, validation on real sperm images, and agreement with HALCON outputs are separate evaluations. The latter two have not yet been completed.
+**Accuracy scope:** This is an independent implementation, not a wrapper around HALCON's native libraries. An additional fit to the original grayscale profile is enabled by default to reduce pixel sampling error. The project owner reviewed the current real-image results and accepted this algorithm as the v1.0 baseline. Synthetic ground-truth validation, quantitative real-image accuracy validation, and agreement with HALCON outputs remain separate evaluations; the latter two have not been established.
 
 ## Visual examples
 
-The following results use synthetic data with known geometry. Validation on real sperm images is pending.
+The following public examples use synthetic data with known geometry. The reviewed real-image results remain local.
 
 ![Grayscale ROI, segmentation mask, extracted centerline, and bending measurement](reports/visualizations/neck-bending-demo.png)
 

@@ -4,10 +4,16 @@ build-backend = "hatchling.build"
 
 [project]
 name = "steger-precision"
-version = "0.1.0"
+version = "1.0.0"
 description = "Float64 Steger line extraction with explicit accuracy validation"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = ["numpy>=2.0", "scipy>=1.14", "pillow>=11"]
+
+[project.urls]
+Repository = "https://github.com/SimonHanYANG/Steger-Python-Version"
+Documentation = "https://github.com/SimonHanYANG/Steger-Python-Version/blob/main/README.md"
+Releases = "https://github.com/SimonHanYANG/Steger-Python-Version/releases"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "matplotlib>=3.9"]
@@ -19,6 +25,14 @@ steger = "steger.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/steger"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/steger", "tools", "tests", "docs", "README.md", "README.zh-CN.md",
+  "CHANGELOG.md", "pyproject.toml", "uv.lock", ".python-version",
+  "reports/accuracy.json", "reports/accuracy-summary.md", "reports/noise-validation.png",
+  "reports/examples", "reports/visualizations", "reports/process",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

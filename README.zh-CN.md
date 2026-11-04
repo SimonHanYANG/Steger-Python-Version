@@ -2,15 +2,17 @@
 
 [English](README.md) | **简体中文**
 
+**稳定版：[v1.0](https://github.com/SimonHanYANG/Steger-Python-Version/releases/tag/v1.0)** · Python 包版本 `1.0.0` · [发布说明（英文）](docs/releases/v1.0.md)
+
 以定位和测量精度为优先的 Python Steger 曲线提取实现，可直接处理灰度 ROI，并用分割 mask 筛选目标。不需要 HALCON、不提供 UI。
 
 基于 Steger 1998 年论文的高斯导数、Hessian 亚像素定位、方向连接、线宽估计和不对称偏差校正；参照 HALCON `lines_gauss` 官方文档提供参数和属性。
 
-**重要的精度约定：**这是独立实现，不是 HALCON 原生库的 Python 包装。默认开启额外的原始灰度截面拟合，以降低像素采样误差。合成真值测试、实际精子样本验证和与 HALCON 的输出一致性是三项不同的验证。目前不声称已经完成后两项。
+**精度范围：**这是独立实现，不是 HALCON 原生库的 Python 包装。默认开启额外的原始灰度截面拟合，以降低像素采样误差。项目负责人已查看当前真实图像结果，认可当前算法，并将其作为 v1.0 基线。合成真值测试、真实图像的定量精度验证和与 HALCON 的输出一致性是三项不同的验证；后两项尚未建立。
 
 ## 可视化示例
 
-以下结果使用已知几何真值的合成数据。真实精子图像的效果将在收到样本后验证。
+以下公开示例使用已知几何真值的合成数据。已提供的真实图像结果保存在本地。
 
 ![灰度 ROI、分割 mask、提取的中心线与弯曲角度](reports/visualizations/neck-bending-demo.png)
 
