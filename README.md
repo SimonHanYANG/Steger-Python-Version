@@ -57,6 +57,14 @@ The local report includes a filterable `index.html`, `angles.csv`, individual me
 
 Incomplete or short centerlines receive no full-neck angle: their local diagnostic angle is stored separately. The primary angle measures end-direction change; reverse bends in an S-shaped neck can cancel. A separate cumulative-turn diagnostic is exported, but it is sensitive to local localization fluctuations. Extent/length checks and sensitivity flags are screening rules, not validated accuracy or confidence bounds. Width bias correction and the additional original-profile fit are disabled in this batch policy because those models have not been validated for the supplied imaging modality. Review masks, centerline placement, crop boundaries, and sensitivity before interpreting estimates. Input images and reports in the default real-data folders are excluded from Git.
 
+To measure computation time on an existing local batch, with all input decoding and disk I/O outside the timers:
+
+```bash
+uv run --extra visualization python tools/benchmark_neck_runtime.py
+```
+
+The benchmark verifies saved angles and statuses, warms the functions, and separately measures angle calculation from resident contours, one fixed-parameter ROI-to-angle run, and the automatic search with quality checks. It exports mean/median/P95 timings, per-image summaries, raw timing samples, and machine/library details to `reports/neck-analysis/runtime/`. Diagnostic-only images are excluded from the angle-only statistics. These timings depend on the machine and input data.
+
 ## Installation
 
 The project uses uv and Python 3.12:
