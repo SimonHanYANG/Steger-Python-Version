@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+reports/halcon/
+/An_unbiased_detector_of_curvilinear_structures.pdf
+
