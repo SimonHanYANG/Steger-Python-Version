@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased — Python package 1.1.0.dev0
+## v1.0.1 — Python package 1.0.1
 
 - Add `measure_neck(roi, mask)` for resident-array adaptive angle measurement,
   including the accepted v1.0 quality and sensitivity diagnostics.
@@ -8,7 +8,12 @@
   eigenproblems to the mask when tracing is off, and reuse contours/angle fits.
 - Preserve float64, full scales/rescue, Newton rules, linking, selection and windows.
 - Add isolated v1.0 bitwise regression checks and interleaved worker benchmarks.
-- Keep the v1.0 stable release and tag unchanged.
+- The project owner accepted the accelerated real-image results. Publish directly
+  from `perf/angle-worker-v1.0`; `main` and the v1.0 tag remain unchanged.
+- Apple M1 mean runtime: 58.76 → 26.52 ms; independent repeat 53.56 → 23.64 ms.
+  Full adaptive ROI/mask computation, with all timing samples retained.
+
+See [v1.0.1 release notes](docs/releases/v1.0.1.md) for validation and installation.
 
 ## v1.0 — Python package 1.0.0
 

@@ -2,9 +2,9 @@
 
 [English README](../README.md) · [中文 README](../README.zh-CN.md)
 
-The development branch `perf/angle-worker-v1.0` (package `1.1.0.dev0`) optimizes
-the accepted v1.0 measurement policy. The v1.0 tag and stable release remain the
-reference. [Runtime and numerical comparisons](../reports/performance/README.md)
+Release `v1.0.1` (package `1.0.1`) publishes the accepted optimization from
+`perf/angle-worker-v1.0`. It is tagged directly from that branch, with `main`
+unchanged. The v1.0 tag remains the numerical reference. [Runtime and numerical comparisons](../reports/performance/README.md)
 describe the tested machine and input set.
 
 ## Array input API
@@ -129,3 +129,9 @@ The 109-test regression suite passed locally and on both Linux and macOS in
 [GitHub Actions](https://github.com/SimonHanYANG/Steger-Python-Version/actions/runs/41798326605).
 The real-data bitwise comparisons and runtime measurements use the local Apple M1;
 the private real inputs are not uploaded to CI.
+
+The timing/equivalence reports retain the exact development-source hash used
+for measurement. Release preparation changes only `__version__` in the Python
+package sources; a [release validation manifest](releases/v1.0.1-validation.json)
+records the correspondence to that accepted implementation. Synthetic accuracy
+is rerun with the release version and records its current source hash.

@@ -1,0 +1,33 @@
+{
+  "release_tag": "v1.0.1",
+  "package_version": "1.0.1",
+  "prepared_utc": "2026-11-04T09:12:12.831989+00:00",
+  "source_branch": "perf/angle-worker-v1.0",
+  "accepted_implementation_commit": "3ecf6c2957a74261e5828c380f81a75420e284e4",
+  "accepted_implementation_source_sha256": "6b4f4b7b031c1a3dee2c259ad588cede38ccbd1b528dda0b5fdb1c380e536bda",
+  "release_implementation_source_sha256": "f3133f2c889183eb621ab8d51209e2ae04d38edc107f0f34e8d462a8e0c15039",
+  "identical_numeric_modules_sha256_excluding_init": "413c3d3cb19954775f27c6b9ae3c2899d80c3fccc93c33df90985c140f9988cc",
+  "python_package_change_from_accepted_implementation": "Only __version__: 1.1.0.dev0 -> 1.0.1; all other Python package bytes identical.",
+  "analysis_and_worker_tools_unchanged": true,
+  "locked_dependencies_unchanged": true,
+  "main_commit_before_release": "94235b04db2ebb0714503069dff9eef0416cc3f4",
+  "merge_into_main": false,
+  "automated_tests": {
+    "command": "uv run --frozen --extra dev pytest -q",
+    "passed": 109
+  },
+  "synthetic_accuracy": {
+    "passed_cases": 84,
+    "total_cases": 84,
+    "circle_passed": true,
+    "all_ground_truth_metrics_exactly_match_accepted_version": true,
+    "report": "reports/accuracy.json"
+  },
+  "optimization_evidence": "reports/performance/optimization.json",
+  "environment": {
+    "platform": "macOS-13.0.1-arm64-arm-64bit",
+    "python": "3.12.13",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1"
+  }
+}

@@ -2,12 +2,13 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-**Stable release: [v1.0](https://github.com/SimonHanYANG/Steger-Python-Version/releases/tag/v1.0)** · Python package `1.0.0` · [Release notes](docs/releases/v1.0.md)
+**Stable release: [v1.0.1](https://github.com/SimonHanYANG/Steger-Python-Version/releases/tag/v1.0.1)** · Python package `1.0.1` · [Release notes](docs/releases/v1.0.1.md)
 
-**Development branch:** `perf/angle-worker-v1.0` (`1.1.0.dev0`) adds a faster
-`measure_neck(roi, mask)` worker while preserving the v1.0 measurement policy.
+This patch release publishes the accepted faster `measure_neck(roi, mask)` worker
+from `perf/angle-worker-v1.0`, preserving the v1.0 measurement policy.
 See [runtime and exact-output comparisons](reports/performance/README.md) and
-[API / reproduction notes](docs/performance.md).
+[API / reproduction notes](docs/performance.md). The release is tagged directly
+from this branch; `main` remains unchanged.
 
 A precision-oriented Python implementation of Steger's curvilinear structure detector. It processes grayscale regions of interest (ROIs) and uses segmentation masks to select target structures. No HALCON installation or graphical interface is required.
 

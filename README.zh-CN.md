@@ -2,11 +2,11 @@
 
 [English](README.md) | **简体中文**
 
-**稳定版：[v1.0](https://github.com/SimonHanYANG/Steger-Python-Version/releases/tag/v1.0)** · Python 包版本 `1.0.0` · [发布说明（英文）](docs/releases/v1.0.md)
+**稳定版：[v1.0.1](https://github.com/SimonHanYANG/Steger-Python-Version/releases/tag/v1.0.1)** · Python 包版本 `1.0.1` · [发布说明（英文）](docs/releases/v1.0.1.md)
 
-**性能开发分支：**`perf/angle-worker-v1.0`（`1.1.0.dev0`）新增直接接收数组的
-`measure_neck(roi, mask)`，复用中间计算并保留 v1.0 的测量规则。
+本次小更新发布已验收的加速版 `measure_neck(roi, mask)`，保留 v1.0 的测量规则。
 参见[耗时和逐位一致性结果](reports/performance/README.md)及[接口与复现说明](docs/performance.md)。
+发布标签直接来自 `perf/angle-worker-v1.0` 分支，`main` 保持不变。
 
 以定位和测量精度为优先的 Python Steger 曲线提取实现，可直接处理灰度 ROI，并用分割 mask 筛选目标。不需要 HALCON、不提供 UI。
 
