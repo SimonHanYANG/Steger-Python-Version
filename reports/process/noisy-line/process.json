@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "label": "Synthetic dark Gaussian line - noise SD 3, asymmetric backgrounds, 8-bit",
+  "parameters": {
+    "sigma": 1.2660254037844387,
+    "low": 0.4,
+    "high": 1.2,
+    "light_dark": "dark",
+    "extract_width": true,
+    "line_model": "gaussian",
+    "complete_junctions": false,
+    "border": "reflect",
+    "refine": true,
+    "profile_refinement": true,
+    "min_length": 0.0
+  },
+  "diagnostics": {
+    "candidate_points": 885,
+    "output_points": 135,
+    "corrected_points": 130,
+    "halcon_parity": "not_verified",
+    "dtype": "float64",
+    "mask_used": false,
+    "intensity_rescaled": false,
+    "profile_refined_points": 108
+  },
+  "normal_definition": "unit eigenvector of maximum-absolute Hessian eigenvalue; row,col components",
+  "normal_sign": "raw eigenvectors have +/- ambiguity; linked contour normals point to the right of traversal",
+  "stages": {
+    "initial_candidates": 1393,
+    "located_candidates": 885,
+    "linked_contours_before_completion": 6,
+    "final_contours": 6
+  },
+  "point_inspection": {
+    "requested_point": [
+      35.06451962500224,
+      36.04977212566794
+    ],
+    "candidate_index": 441,
+    "pixel_row": 35,
+    "pixel_col": 36,
+    "hessian": [
+      [
+        14.420739262415239,
+        11.254173088199833
+      ],
+      [
+        11.254173088199833,
+        8.513713879104237
+      ]
+    ],
+    "gradient": [
+      -1.2983915468354092,
+      -1.3708552474197702
+    ],
+    "normal": [
+      -0.7917831842535443,
+      -0.6108022504324276
+    ],
+    "lambda_normal": 23.102502636196757,
+    "taylor_t": -0.08074303000315157,
+    "subpixel_point_before_bias_correction": [
+      35.06451962500224,
+      36.04977212566794
+    ]
+  },
+  "raw_arrays": "process.npz"
+}

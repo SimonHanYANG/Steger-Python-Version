@@ -26,6 +26,24 @@ Regenerate these figures with:
 uv run --extra dev python tools/visualize_results.py
 ```
 
+## Inspect the intermediate process
+
+Steger estimates a normal axis from the Hessian eigenvector with the largest absolute eigenvalue. It then finds a subpixel line point by locating a zero of the first directional derivative along that normal. This calculation precedes contour linking and bias correction.
+
+![Recorded Hessian normals and final normals](reports/process/circular-neck/normals.png)
+
+Cyan segments show normal axes, amber segments show perpendicular tangent axes, and green shows the centerline. Their display lengths are fixed, not measured widths. These are synthetic examples. The [complete recorded report](reports/process/circular-neck/README.md) also includes derivative maps, eigenvalues, candidate selection, and a single-point inspection with the actual Hessian, gradient, and subpixel offset.
+
+Generate the same report for an ROI and mask:
+
+```bash
+uv run --extra visualization steger detect roi.tif --mask neck_mask.png \
+  --sigma 1.5 --low 3 --high 8 --polarity dark --model gaussian \
+  --no-complete-junctions --output results/result.json --process-dir results/process
+```
+
+Add `--inspect-point ROW COL` to inspect the nearest located candidate. The report saves lossless arrays in `process.npz` as well as figures. In Python, use `lines_gauss(..., return_trace=True)` followed by `save_process_report` from `steger.visualization`. Recording is optional and tested to preserve detector outputs exactly. See [the algorithm and process guide](docs/steger-process.md).
+
 ## Installation
 
 The project uses uv and Python 3.12:

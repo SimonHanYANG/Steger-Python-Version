@@ -654,17 +654,21 @@ dev = [
 halcon = [
     { name = "mvtec-halcon" },
 ]
+visualization = [
+    { name = "matplotlib" },
+]
 
 [package.metadata]
 requires-dist = [
     { name = "matplotlib", marker = "extra == 'dev'", specifier = ">=3.9" },
+    { name = "matplotlib", marker = "extra == 'visualization'", specifier = ">=3.9" },
     { name = "mvtec-halcon", marker = "extra == 'halcon'" },
     { name = "numpy", specifier = ">=2.0" },
     { name = "pillow", specifier = ">=11" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
     { name = "scipy", specifier = ">=1.14" },
 ]
-provides-extras = ["dev", "halcon"]
+provides-extras = ["dev", "visualization", "halcon"]
 
 [[package]]
 name = "tzdata"

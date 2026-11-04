@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "label": "Synthetic circular arc with known geometry - not a real sperm image",
+  "parameters": {
+    "sigma": 1.5,
+    "low": 0.4,
+    "high": 1.2,
+    "light_dark": "light",
+    "extract_width": true,
+    "line_model": "gaussian",
+    "complete_junctions": false,
+    "border": "reflect",
+    "refine": true,
+    "profile_refinement": true,
+    "min_length": 0.0
+  },
+  "diagnostics": {
+    "candidate_points": 61,
+    "output_points": 54,
+    "corrected_points": 54,
+    "halcon_parity": "not_verified",
+    "dtype": "float64",
+    "mask_used": true,
+    "intensity_rescaled": false,
+    "profile_refined_points": 54
+  },
+  "normal_definition": "unit eigenvector of maximum-absolute Hessian eigenvalue; row,col components",
+  "normal_sign": "raw eigenvectors have +/- ambiguity; linked contour normals point to the right of traversal",
+  "stages": {
+    "initial_candidates": 121,
+    "located_candidates": 61,
+    "linked_contours_before_completion": 1,
+    "final_contours": 1
+  },
+  "point_inspection": {
+    "requested_point": [
+      80.34963807290585,
+      72.23546932386631
+    ],
+    "candidate_index": 29,
+    "pixel_row": 80,
+    "pixel_col": 72,
+    "hessian": [
+      [
+        -14.367722774520852,
+        -9.886160563597217
+      ],
+      [
+        -9.886160563597217,
+        -6.346188640803006
+      ]
+    ],
+    "gradient": [
+      7.639846922868555,
+      5.145481981678517
+    ],
+    "normal": [
+      -0.8294382625809372,
+      -0.5585983964949383
+    ],
+    "lambda_normal": -21.025714921076812,
+    "taylor_t": -0.43808447783215243,
+    "subpixel_point_before_bias_correction": [
+      80.34963807290585,
+      72.23546932386631
+    ]
+  },
+  "raw_arrays": "process.npz"
+}

@@ -31,6 +31,16 @@ def main(argv=None):
     detect.add_argument("--min-length", type=float, default=0)
     detect.add_argument("--output", required=True)
     detect.add_argument("--overlay")
+    detect.add_argument(
+        "--process-dir", help="Save recorded intermediate arrays and process figures"
+    )
+    detect.add_argument(
+        "--inspect-point",
+        nargs=2,
+        type=float,
+        metavar=("ROW", "COL"),
+        help="Inspect the located candidate nearest this pixel; requires --process-dir",
+    )
     detect.add_argument("--measure-neck", action="store_true")
     detect.add_argument("--contour-index", type=int)
     compare = sub.add_parser("compare")
@@ -40,6 +50,8 @@ def main(argv=None):
     compare.add_argument("--tolerance", type=float, default=0.1)
     compare.add_argument("--p95-limit", type=float, default=0.05)
     args = parser.parse_args(argv)
+    if args.command == "detect" and args.inspect_point is not None and not args.process_dir:
+        parser.error("--inspect-point requires --process-dir")
     try:
         if args.command == "compare":
             report = compare_results(
@@ -66,6 +78,7 @@ def main(argv=None):
             min_length=args.min_length,
             refine=not args.no_newton_refinement,
             profile_refinement=not args.no_profile_refinement,
+            return_trace=bool(args.process_dir),
         )
         data = result.to_dict()
         data["engine"] = "steger-precision"
@@ -81,6 +94,22 @@ def main(argv=None):
             else:
                 c = result.contours[args.contour_index]
             data["neck_measurement"] = measure_bending(c).to_dict()
+        if args.process_dir:
+            try:
+                from .visualization import save_process_report
+            except ModuleNotFoundError as error:
+                if error.name == "matplotlib":
+                    raise ValueError(
+                        "Process figures require matplotlib: uv sync --extra visualization"
+                    ) from error
+                raise
+            save_process_report(
+                result,
+                args.process_dir,
+                inspect_point=args.inspect_point,
+                label=Path(args.image).name,
+            )
+            data["process_directory"] = str(Path(args.process_dir).resolve())
         write_json(args.output, data)
         if args.overlay:
             overlay(image, result, args.overlay)

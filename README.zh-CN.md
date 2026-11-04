@@ -26,6 +26,24 @@
 uv run --extra dev python tools/visualize_results.py
 ```
 
+## 查看中间过程
+
+Steger 从 Hessian 中选取绝对值最大的特征值所对应的特征向量，估计局部法向，再沿法向寻找一阶方向导数为零的位置，得到亚像素线点。这个计算发生在曲线连接和偏差校正之前。
+
+![记录的 Hessian 法向与最终法向](reports/process/circular-neck/normals.png)
+
+青色短线表示法向轴，黄色短线表示与之垂直的切向轴，绿色是中心线。短线长度仅为显示，不表示测得线宽。以上为合成样本。[完整过程报告](reports/process/circular-neck/README.md)还包含导数图、特征值、候选点筛选，以及展示真实 Hessian、梯度和亚像素偏移量的单点检查图。
+
+对自己的 ROI 和 mask 生成过程报告：
+
+```bash
+uv run --extra visualization steger detect roi.tif --mask neck_mask.png \
+  --sigma 1.5 --low 3 --high 8 --polarity dark --model gaussian \
+  --no-complete-junctions --output results/result.json --process-dir results/process
+```
+
+添加 `--inspect-point ROW COL` 可检查距离指定位置最近的有效候选点。除了图片，报告还会将原始数组无损保存到 `process.npz`。Python 中先调用 `lines_gauss(..., return_trace=True)`，再调用 `steger.visualization` 中的 `save_process_report`。过程记录可选，已通过测试确认不会改变检测输出。详见[算法与过程说明（英文）](docs/steger-process.md)。
+
 ## 安装
 
 项目使用 uv 和 Python 3.12：

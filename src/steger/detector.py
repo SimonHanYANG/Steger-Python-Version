@@ -1,13 +1,13 @@
 """Public HALCON-shaped interface, implemented independently in Python/SciPy."""
 
 import numpy as np
-from scipy.ndimage import map_coordinates, spline_filter
+from scipy.ndimage import convolve1d, map_coordinates, spline_filter
 
-from .derivatives import hessian_normals, image_derivatives
+from .derivatives import gaussian_masks, hessian_normals, image_derivatives
 from .linking import complete_junctions as _complete
 from .linking import link_points
 from .refinement import refine_contour
-from .types import DetectionResult
+from .types import Contour, DetectionResult, DetectionTrace
 from .width import extract_widths
 
 
@@ -17,6 +17,16 @@ def _boolean(value, name):
     if isinstance(value, str) and value in ("true", "false"):
         return value == "true"
     raise ValueError(f"{name} must be bool or 'true'/'false'")
+
+
+def _snapshot(contour):
+    return Contour(
+        contour.points.copy(),
+        contour.normals.copy(),
+        contour.response.copy(),
+        {key: value.copy() for key, value in contour.attributes.items()},
+        contour.closed,
+    )
 
 
 def lines_gauss(
@@ -34,6 +44,7 @@ def lines_gauss(
     border="reflect",
     refine=True,
     profile_refinement=True,
+    return_trace=False,
 ):
     """Extract ordered, subpixel centerlines and per-point attributes.
 
@@ -44,6 +55,8 @@ def lines_gauss(
 
     refine=True performs additional cubic-interpolated Newton updates of ridge
     positions. Set False for the literal single Taylor step of the 1998 paper.
+    return_trace=True retains actual intermediate arrays and contour snapshots
+    for process visualization, without modifying the numerical calculation.
     """
     raw = np.asarray(image)
     if raw.ndim != 2 or min(raw.shape, default=0) < 3:
@@ -73,11 +86,17 @@ def lines_gauss(
     complete_junctions = _boolean(complete_junctions, "complete_junctions")
     refine = _boolean(refine, "refine")
     profile_refinement = _boolean(profile_refinement, "profile_refinement")
+    return_trace = _boolean(return_trace, "return_trace")
     selected = np.ones(img.shape, dtype=bool) if mask is None else np.asarray(mask) != 0
     if selected.shape != img.shape:
         raise ValueError("mask and image shapes must match; supply an aligned mask")
     derivatives = image_derivatives(img, sigma, border=border)
-    normals, response = hessian_normals(derivatives, light_dark)
+    if return_trace:
+        normals, response, eigenvalues = hessian_normals(
+            derivatives, light_dark, with_eigenvalues=True
+        )
+    else:
+        normals, response = hessian_normals(derivatives, light_dark)
     nr, nc = normals[..., 0], normals[..., 1]
     denominator = (
         derivatives["rr"] * nr * nr + 2 * derivatives["rc"] * nr * nc + derivatives["cc"] * nc * nc
@@ -105,6 +124,27 @@ def lines_gauss(
     points = rc.astype(np.float64) + off[valid]
     ns = normals[valid].copy()
     strength = response[valid].copy()
+    trace = None
+    if return_trace:
+        g0 = gaussian_masks(sigma)[0]
+        smoothed = convolve1d(convolve1d(img, g0, axis=0, mode=border), g0, axis=1, mode=border)
+        trace = DetectionTrace(
+            image=img.copy(),
+            mask=selected.copy(),
+            smoothed=smoothed,
+            derivatives={key: value.copy() for key, value in derivatives.items()},
+            eigenvalues=eigenvalues.copy(),
+            hessian_normals=normals.copy(),
+            response=response.copy(),
+            taylor_t=t.copy(),
+            taylor_offset=off.copy(),
+            initial_candidate_pixels=rc.copy(),
+            initial_candidate_points=points.copy(),
+            candidate_pixels=rc.copy(),
+            candidate_points=points.copy(),
+            candidate_normals=ns.copy(),
+            candidate_response=strength.copy(),
+        )
     if refine and len(points):
         co = {k: spline_filter(v, order=3, mode="reflect") for k, v in derivatives.items()}
         for _ in range(6):
@@ -125,11 +165,21 @@ def lines_gauss(
             # Keep refinement in the originating pixel's neighborhood.
             acceptable = np.all(np.abs(proposed - rc) <= 1.5, axis=1)
             points[acceptable] = proposed[acceptable]
+            if trace is not None:
+                trace.newton_positions.append(points.copy())
             if np.max(np.abs(step), initial=0) < 1e-8:
                 break
         accepted = np.all(np.abs(points - rc) <= 0.5 + 1e-6, axis=1)
         points, ns, strength = points[accepted], ns[accepted], strength[accepted]
+        if trace is not None:
+            trace.candidate_pixels = rc[accepted].copy()
+    if trace is not None:
+        trace.candidate_points = points.copy()
+        trace.candidate_normals = ns.copy()
+        trace.candidate_response = strength.copy()
     contours, junctions = link_points(points, ns, strength, high)
+    if trace is not None:
+        trace.linked_contours = [_snapshot(c) for c in contours]
     if complete_junctions:
         contours, junctions = _complete(contours, sigma)
     if min_length:
@@ -143,12 +193,16 @@ def lines_gauss(
     if extract_width:
         for c in contours:
             extract_widths(c, derivatives, sigma, line_model, light_dark)
+            if trace is not None:
+                trace.bias_corrected_contours.append(_snapshot(c))
             if profile_refinement and line_model != "none":
                 c.attributes["steger_row"] = c.rows.copy()
                 c.attributes["steger_col"] = c.cols.copy()
                 c.attributes["steger_width_left"] = c.attributes["width_left"].copy()
                 c.attributes["steger_width_right"] = c.attributes["width_right"].copy()
                 refine_contour(c, img, sigma, line_model, light_dark)
+    elif trace is not None:
+        trace.bias_corrected_contours = [_snapshot(c) for c in contours]
     parameters = dict(
         sigma=sigma,
         low=low,
@@ -180,6 +234,7 @@ def lines_gauss(
                 sum(np.count_nonzero(c.attributes.get("profile_fit_valid", [])) for c in contours)
             ),
         },
+        trace=trace,
     )
 
 

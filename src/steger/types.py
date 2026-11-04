@@ -60,11 +60,40 @@ class Junction:
 
 
 @dataclass
+class DetectionTrace:
+    """Optional snapshots of the values actually used by the detector.
+
+    Coordinates and vectors use (row, column). Hessian eigenvalues are sorted
+    algebraically, as returned by numpy.linalg.eigh. Snapshot arrays are copies.
+    """
+
+    image: FloatArray
+    mask: NDArray[np.bool_]
+    smoothed: FloatArray
+    derivatives: dict[str, FloatArray]
+    eigenvalues: FloatArray
+    hessian_normals: FloatArray
+    response: FloatArray
+    taylor_t: FloatArray
+    taylor_offset: FloatArray
+    initial_candidate_pixels: NDArray[np.int64]
+    initial_candidate_points: FloatArray
+    candidate_pixels: NDArray[np.int64]
+    candidate_points: FloatArray
+    candidate_normals: FloatArray
+    candidate_response: FloatArray
+    newton_positions: list[FloatArray] = field(default_factory=list)
+    linked_contours: list[Contour] = field(default_factory=list)
+    bias_corrected_contours: list[Contour] = field(default_factory=list)
+
+
+@dataclass
 class DetectionResult:
     contours: list[Contour]
     junctions: list[Junction]
     parameters: dict[str, Any]
     diagnostics: dict[str, Any] = field(default_factory=dict)
+    trace: DetectionTrace | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {

@@ -55,7 +55,9 @@ def sample(array: FloatArray, points: FloatArray, *, order: int = 3) -> FloatArr
     )
 
 
-def hessian_normals(d: dict[str, FloatArray], polarity: str) -> tuple[FloatArray, FloatArray]:
+def hessian_normals(
+    d: dict[str, FloatArray], polarity: str, *, with_eigenvalues: bool = False
+) -> tuple[FloatArray, FloatArray] | tuple[FloatArray, FloatArray, FloatArray]:
     shape = d["r"].shape
     h = np.empty((*shape, 2, 2), dtype=np.float64)
     h[..., 0, 0], h[..., 0, 1] = d["rr"], d["rc"]
@@ -65,4 +67,6 @@ def hessian_normals(d: dict[str, FloatArray], polarity: str) -> tuple[FloatArray
     lam = np.take_along_axis(values, choose[..., None], axis=-1)[..., 0]
     normal = np.take_along_axis(vectors, choose[..., None, None], axis=-1)[..., 0]
     response = -lam if polarity == "light" else lam
+    if with_eigenvalues:
+        return normal, response, values
     return normal, response

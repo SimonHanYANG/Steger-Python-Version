@@ -14,7 +14,7 @@ Contrast is 150 gray levels. Noisy cases include 8-bit rounding. Noiseless cases
 
 Circular neck: expected window direction difference 63.000000 degrees; measured 62.999477 degrees; absolute difference **0.000523 degrees**.
 
-Source hash: `b55261c39a05dfb64b2c75dd42b30611e4106ea6c71ab26305a109e8a9505367`.
+Source hash: `d972de5854ebc889688b19e10bb718f21f3d3cda9dce7c28cfe0519a5938b790`.
 
 The raw report retains every case, including pre-refinement errors, width errors, fit acceptance coverage, parameters, and execution time.
 

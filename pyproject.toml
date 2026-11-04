@@ -11,6 +11,7 @@ dependencies = ["numpy>=2.0", "scipy>=1.14", "pillow>=11"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "matplotlib>=3.9"]
+visualization = ["matplotlib>=3.9"]
 halcon = ["mvtec-halcon"]
 
 [project.scripts]
