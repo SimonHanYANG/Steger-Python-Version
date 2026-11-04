@@ -2,8 +2,18 @@ name: Publish release
 
 on:
   push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/release.yml"
     tags:
-      - "v[0-9]*"
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build and publish"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -20,7 +30,28 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - name: Verify release metadata
+      - name: Select existing release tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          uv run --frozen --extra dev python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+
+          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+          if os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch":
+              tag = os.environ["INPUT_TAG"]
+          elif os.environ["GITHUB_REF_TYPE"] == "tag":
+              tag = os.environ["GITHUB_REF_NAME"]
+          else:
+              tag = "v" + version.removesuffix(".0")
+          assert tag in {"v" + version, "v" + version.removesuffix(".0")}
+          with open(os.environ["GITHUB_ENV"], "a") as stream:
+              stream.write("RELEASE_TAG=" + tag + "\n")
+          PY
+          git checkout "$RELEASE_TAG"
+      - name: Verify tagged version
         run: |
           uv run --frozen --extra dev python - <<'PY'
           import os
@@ -29,7 +60,7 @@ jobs:
           from steger import __version__
 
           version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
-          tag = os.environ["GITHUB_REF_NAME"]
+          tag = os.environ["RELEASE_TAG"]
           assert __version__ == version
           assert tag in {"v" + version, "v" + version.removesuffix(".0")}
           assert (Path("docs/releases") / (tag + ".md")).is_file()
@@ -53,7 +84,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.whl dist/*.tar.gz dist/SHA256SUMS \
-            --verify-tag --draft --title "Steger Python $GITHUB_REF_NAME" \
-            --notes-file "docs/releases/$GITHUB_REF_NAME.md"
-          gh release edit "$GITHUB_REF_NAME" --draft=false --latest
+          if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > release-draft.txt; then
+            if [ "$(cat release-draft.txt)" = "false" ]; then
+              echo "Release is already published; leaving its artifacts unchanged."
+              exit 0
+            fi
+            gh release upload "$RELEASE_TAG" dist/*.whl dist/*.tar.gz dist/SHA256SUMS --clobber
+          else
+            gh release create "$RELEASE_TAG" dist/*.whl dist/*.tar.gz dist/SHA256SUMS \
+              --verify-tag --draft --title "Steger Python $RELEASE_TAG" \
+              --notes-file "docs/releases/$RELEASE_TAG.md"
+          fi
+          gh release edit "$RELEASE_TAG" --draft=false --latest
