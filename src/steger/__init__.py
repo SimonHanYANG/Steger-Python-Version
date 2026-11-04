@@ -5,7 +5,7 @@ from .measurement import BendingMeasurement, measure_bending
 from .neck import measure_neck
 from .types import Contour, DetectionResult, DetectionTrace, Junction
 
-__version__ = "1.0.1"
+__version__ = "1.0.2.dev0"
 __all__ = [
     "lines_gauss",
     "calculate_lines_gauss_parameters",

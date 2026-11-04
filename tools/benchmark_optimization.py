@@ -47,10 +47,10 @@ def source_sha256():
 
 
 @contextmanager
-def reference_modules():
+def reference_modules(reference_commit=REFERENCE_COMMIT):
     """A separate package prevents either version's relative imports leaking."""
     commit = subprocess.check_output(
-        ["git", "rev-parse", f"{REFERENCE_COMMIT}^{{commit}}"], cwd=ROOT, text=True
+        ["git", "rev-parse", f"{reference_commit}^{{commit}}"], cwd=ROOT, text=True
     ).strip()
     names = subprocess.check_output(
         ["git", "ls-tree", "-r", "--name-only", commit, "src/steger"], cwd=ROOT, text=True
@@ -254,7 +254,12 @@ def main():
     parser.add_argument("--pair", nargs=2, action="append", default=[], metavar=("ROI", "MASK"))
     parser.add_argument("--rounds", type=int, default=20)
     parser.add_argument("--synthetic", action="store_true")
-    parser.add_argument("--cold-only", choices=("v1.0", "optimized"), help=argparse.SUPPRESS)
+    parser.add_argument(
+        "--reference", default=REFERENCE_COMMIT, help="Frozen Git ref to compare, e.g. v1.0.1"
+    )
+    parser.add_argument(
+        "--cold-only", choices=("reference", "v1.0", "optimized"), help=argparse.SUPPRESS
+    )
     parser.add_argument(
         "--output", type=Path, default=Path("reports/neck-analysis/performance/optimization.json")
     )
@@ -264,6 +269,7 @@ def main():
     if args.rounds < 1:
         parser.error("--rounds must be positive")
     source_at_start = source_sha256()
+    reference_label = "v1.0" if args.reference == REFERENCE_COMMIT else args.reference
     paths = current_batch.image_pairs(args.input_dir) if args.input_dir else []
     paths += [(Path(a), Path(b)) for a, b in args.pair]
     cases = []
@@ -274,10 +280,10 @@ def main():
             digest.update(str((array.shape, array.dtype.str)).encode())
             digest.update(array.tobytes())
         cases.append((a.stem, roi, mask, read_image(a), read_image(b, mask=True)))
-    with reference_modules() as (reference, batch, worker, commit):
+    with reference_modules(args.reference) as (reference, batch, worker, commit):
         if args.cold_only:
             function = (
-                worker.compute_from_arrays if args.cold_only == "v1.0" else compute_from_arrays
+                compute_from_arrays if args.cold_only == "optimized" else worker.compute_from_arrays
             )
             with ThreadPoolExecutor(max_workers=1) as executor:
                 output, elapsed = executor.submit(
@@ -288,10 +294,13 @@ def main():
         print("Checking real outputs, every search candidate, and full traces...", flush=True)
         parity = real_parity(batch, worker, cases)
         if args.synthetic:
-            print("Checking the 84 synthetic cases and circle against v1.0...", flush=True)
+            print(
+                f"Checking the 84 synthetic cases and circle against {reference_label}...",
+                flush=True,
+            )
             parity.update(synthetic_parity(reference))
         print(f"Exact parity passed: {parity}", flush=True)
-        functions = {"v1.0": worker.compute_from_arrays, "optimized": compute_from_arrays}
+        functions = {reference_label: worker.compute_from_arrays, "optimized": compute_from_arrays}
         samples = {name: [] for name in functions}
         per_image = {name: {case[0]: [] for case in cases} for name in functions}
         outputs = {}
@@ -326,13 +335,16 @@ def main():
                 str(Path(__file__).resolve()),
                 "--input-dir",
                 str(args.input_dir),
+                "--reference",
+                args.reference,
                 "--cold-only",
-                name,
+                "optimized" if name == "optimized" else "reference",
             ]
             cold_process[name] = json.loads(subprocess.check_output(command, cwd=ROOT, text=True))
         report = dict(
             measured_utc=datetime.now(timezone.utc).isoformat(),
             reference_commit=commit,
+            reference_label=reference_label,
             implementation_source_sha256=source_at_start,
             dataset_sha256=digest.hexdigest(),
             environment=dict(
@@ -350,7 +362,7 @@ def main():
             ),
             stages=stages,
             samples_ms=samples,
-            speedup=stages["v1.0"]["mean_ms"] / stages["optimized"]["mean_ms"],
+            speedup=stages[reference_label]["mean_ms"] / stages["optimized"]["mean_ms"],
             first_worker_call_after_parity_ms=cold,
             first_call_fresh_process=cold_process,
             per_image={

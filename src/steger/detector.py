@@ -122,6 +122,8 @@ class _RidgeFields:
         self.image = image
         self.derivatives = d = image_derivatives(image, sigma, border=border)
         self.eigenvalues = None
+        self.pixels = None
+        samples = d
         if trace:
             self.normals, self.dark_response, self.eigenvalues = hessian_normals(
                 d, "dark", with_eigenvalues=True
@@ -129,17 +131,16 @@ class _RidgeFields:
         elif selected.all():
             self.normals, self.dark_response = hessian_normals(d, "dark")
         else:
-            n, response = hessian_normals({k: v[selected] for k, v in d.items()}, "dark")
-            self.normals = np.zeros((*image.shape, 2), dtype=np.float64)
-            self.dark_response = np.zeros(image.shape, dtype=np.float64)
-            self.normals[selected], self.dark_response[selected] = n, response
+            self.pixels = np.argwhere(selected)
+            samples = {k: v[selected] for k, v in d.items()}
+            self.normals, self.dark_response = hessian_normals(samples, "dark")
         nr, nc = self.normals[..., 0], self.normals[..., 1]
         self.denominator = denominator = (
-            d["rr"] * nr * nr + 2 * d["rc"] * nr * nc + d["cc"] * nc * nc
+            samples["rr"] * nr * nr + 2 * samples["rc"] * nr * nc + samples["cc"] * nc * nc
         )
-        self.t = np.zeros(image.shape)
+        self.t = np.zeros(self.dark_response.shape)
         np.divide(
-            -(d["r"] * nr + d["c"] * nc),
+            -(samples["r"] * nr + samples["c"] * nc),
             denominator,
             out=self.t,
             where=np.abs(denominator) > 1e-14,
@@ -216,13 +217,13 @@ def _extract(
     # neighborhood only when Newton refinement will verify the final location.
     initial_limit = 1.5 if refine else 0.5
     valid = (
-        selected
+        (selected if fields.pixels is None else True)
         & (response > 0)
         & (response >= low)
         & (np.abs(denominator) > 1e-14)
         & np.all(np.abs(off) <= initial_limit + 1e-12, axis=-1)
     )
-    rc = np.argwhere(valid)
+    rc = np.argwhere(valid) if fields.pixels is None else fields.pixels[valid]
     points = rc.astype(np.float64) + off[valid]
     ns = normals[valid].copy()
     strength = response[valid].copy()

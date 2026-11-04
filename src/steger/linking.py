@@ -9,7 +9,15 @@ from .types import Contour, Junction
 def orient_normals(points, normals):
     if len(points) < 2:
         return normals.copy()
-    tangent = np.gradient(points, axis=0)
+    # Same unit-spacing first-order boundary / centered interior differences as
+    # np.gradient, avoiding its general N-D argument processing for short paths.
+    points = np.asarray(points)
+    if points.dtype.kind not in "fc":
+        points = points.astype(np.float64)
+    tangent = np.empty_like(points)
+    tangent[1:-1] = (points[2:] - points[:-2]) / 2.0
+    tangent[0] = points[1] - points[0]
+    tangent[-1] = points[-1] - points[-2]
     right = np.column_stack([tangent[:, 1], -tangent[:, 0]])
     out = normals.copy()
     out[np.einsum("ij,ij->i", out, right) < 0] *= -1
@@ -23,9 +31,16 @@ def link_points(points, normals, responses, high):
     # Several pixels may describe essentially the same subpixel line point.
     tree = cKDTree(points)
     keep = np.ones(len(points), dtype=bool)
+    # Query dispatch is expensive for short necks. Batch small clouds; retain
+    # the sequential path for large/dense inputs to bound temporary storage.
+    duplicates = (
+        tree.query_ball_point(points, 0.22, return_sorted=False) if len(points) <= 512 else None
+    )
     for i in np.argsort(-responses, kind="stable"):
         if keep[i]:
-            for j in tree.query_ball_point(points[i], 0.22):
+            for j in (
+                duplicates[i] if duplicates is not None else tree.query_ball_point(points[i], 0.22)
+            ):
                 if j != i:
                     keep[j] = False
     points, normals, responses = points[keep], normals[keep], responses[keep]
@@ -34,21 +49,30 @@ def link_points(points, normals, responses, high):
     graph = [set() for _ in points]
     for i, adjacent in enumerate(neighbors):
         tangent = np.array([-normals[i, 1], normals[i, 0]])
-        for sign in (-1, 1):
-            choices = []
-            for j in adjacent:
-                if i == j:
-                    continue
-                delta = points[j] - points[i]
-                distance = np.linalg.norm(delta)
-                advance = np.dot(delta, tangent) * sign
-                if advance < 0.22 or advance / distance < 0.5:
-                    continue
-                cosine = np.clip(abs(np.dot(normals[i], normals[j])), 0, 1)
-                angle = np.arccos(cosine)
-                if angle > np.pi / 3:
-                    continue
-                choices.append((distance + angle, j))
+        choices_by_sign = ([], [])
+        for j in adjacent:
+            if i == j:
+                continue
+            # The two directions use the identical distance and projection.
+            # Keep the original norm/dot arithmetic and lexicographic scores.
+            delta = points[j] - points[i]
+            distance = np.linalg.norm(delta)
+            projection = np.dot(delta, tangent)
+            # A finite projection can pass the positive advance gate in only
+            # one direction. abs is exactly the original projection * sign.
+            advance = abs(projection)
+            if advance < 0.22 or advance / distance < 0.5:
+                continue
+            cosine = abs(np.dot(normals[i], normals[j]))
+            # abs already enforces the lower clip bound; preserve float64
+            # and the original arccos/angle threshold, including ties.
+            if cosine > 1:
+                cosine = np.float64(1.0)
+            angle = np.arccos(cosine)
+            if angle > np.pi / 3:
+                continue
+            choices_by_sign[0 if projection < 0 else 1].append((distance + angle, j))
+        for choices in choices_by_sign:
             if choices:
                 j = min(choices)[1]
                 graph[i].add(j)
@@ -77,20 +101,20 @@ def link_points(points, normals, responses, high):
         path = [start]
         prev, cur = start, second
         while True:
-            used.add(tuple(sorted((prev, cur))))
+            used.add((prev, cur) if prev < cur else (cur, prev))
             path.append(cur)
             if len(graph[cur]) != 2 or cur == start:
                 break
             nxt = next(j for j in graph[cur] if j != prev)
-            if tuple(sorted((cur, nxt))) in used:
+            if ((cur, nxt) if cur < nxt else (nxt, cur)) in used:
                 break
             prev, cur = cur, nxt
         if len(path) >= 2:
             ids = np.asarray(path)
             idx = len(contours)
-            p, n = points[ids].copy(), normals[ids].copy()
+            p, n = points[ids], normals[ids]
             contours.append(
-                Contour(p, orient_normals(p, n), responses[ids].copy(), closed=path[0] == path[-1])
+                Contour(p, orient_normals(p, n), responses[ids], closed=path[0] == path[-1])
             )
             for k in (path[0], path[-1]):
                 membership.setdefault(k, set()).add(idx)
@@ -100,7 +124,7 @@ def link_points(points, normals, responses, high):
     starts += [i for i in range(len(points)) if active[i] and len(graph[i]) == 2]
     for i in starts:
         for j in sorted(graph[i]):
-            if tuple(sorted((i, j))) not in used:
+            if ((i, j) if i < j else (j, i)) not in used:
                 trace(i, j)
     junctions = [
         Junction(points[k].copy(), tuple(sorted(v))) for k, v in membership.items() if len(v) > 1
