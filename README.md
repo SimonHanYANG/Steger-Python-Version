@@ -105,6 +105,7 @@ uv run steger detect roi.tif --mask neck_mask.png \
 ```bash
 uv run --extra dev pytest -q
 uv run python tools/benchmark.py --output reports/accuracy.json
+uv run --extra dev python tools/summarize_benchmark.py reports/accuracy.json
 ```
 
 完整基准包括 84 组直线样本与一组圆弧：三种截面、多个线宽和旋转方向、非整数平移、对称/不对称背景、亮/暗线、8 位量化和固定随机噪声。图像由独立的连续模型进行像素面积积分生成，不使用阈值绘图作为亚像素真值。条状截面的像素面积为精确计算；其他截面使用 Gauss-Legendre 积分。
@@ -118,7 +119,7 @@ uv run python tools/benchmark.py --output reports/accuracy.json
 | 对比度 150，灰度噪声标准差 3，8 位量化 | ≤ 0.20 px | ≤ 0.30 px | ≥ 95% |
 | 指定半径圆弧 | 径向误差 P95 ≤ 0.01 px | 两个测量窗口方向差误差 ≤ 0.1° | 单独报告 |
 
-报告保留每一组结果，包括检测失败、增强前后误差、拟合通过率和运行时间。具体实测数值见 [`reports/accuracy.json`](reports/accuracy.json)。这些指标只适用于报告中注明的合成条件，不是未知显微图像的通用误差保证。
+报告保留每一组结果，包括检测失败、增强前后误差、拟合通过率和运行时间。可读摘要见 [`reports/accuracy-summary.md`](reports/accuracy-summary.md)，完整实测数值见 [`reports/accuracy.json`](reports/accuracy.json)。报告记录实现源文件的 SHA-256，便于确认测试对应的代码版本。这些指标只适用于报告中注明的合成条件，不是未知显微图像的通用误差保证。
 
 ## 接近论文流程的运行方式
 

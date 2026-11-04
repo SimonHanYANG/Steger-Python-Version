@@ -3,6 +3,7 @@
 No Sobel finite differences, integer derivative buffers, image rescaling, or
 scale-normalized response. All convolution and eigendecomposition use float64.
 """
+
 from functools import lru_cache
 
 import numpy as np
@@ -32,7 +33,9 @@ def gaussian_masks(sigma: float, truncate: float = 6.0) -> tuple[FloatArray, ...
     return g0, g1, g2
 
 
-def image_derivatives(image: FloatArray, sigma: float, *, border: str = "reflect") -> dict[str, FloatArray]:
+def image_derivatives(
+    image: FloatArray, sigma: float, *, border: str = "reflect"
+) -> dict[str, FloatArray]:
     g0, g1, g2 = gaussian_masks(sigma)
     smooth_r = convolve1d(image, g0, axis=0, mode=border)
     first_r = convolve1d(image, g1, axis=0, mode=border)
@@ -47,7 +50,9 @@ def image_derivatives(image: FloatArray, sigma: float, *, border: str = "reflect
 
 
 def sample(array: FloatArray, points: FloatArray, *, order: int = 3) -> FloatArray:
-    return map_coordinates(array, np.asarray(points).T, order=order, mode="reflect", prefilter=order > 1)
+    return map_coordinates(
+        array, np.asarray(points).T, order=order, mode="reflect", prefilter=order > 1
+    )
 
 
 def hessian_normals(d: dict[str, FloatArray], polarity: str) -> tuple[FloatArray, FloatArray]:
@@ -61,4 +66,3 @@ def hessian_normals(d: dict[str, FloatArray], polarity: str) -> tuple[FloatArray
     normal = np.take_along_axis(vectors, choose[..., None, None], axis=-1)[..., 0]
     response = -lam if polarity == "light" else lam
     return normal, response
-
