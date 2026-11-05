@@ -58,4 +58,4 @@
 - https://www.mvtec.com/doc/halcon/2411/en/get_contour_attrib_xld.html
 - https://www.mvtec.com/doc/halcon/2411/en/derivate_gauss.html
 
-未运行 HALCON 原生库；无实际精子 ROI/mask。结果中 `halcon_parity` 始终明确为 `not_verified`，不会因为合成测试通过而被改成已验证。
+未运行 HALCON 原生库。已提供的真实精子 ROI/mask 用于结果检查、v1.0 输出回归及性能测试，尚无真实几何真值用于定量精度评估。结果中 `halcon_parity` 始终明确为 `not_verified`，不会因为合成测试或版本一致性测试通过而被改成已验证。

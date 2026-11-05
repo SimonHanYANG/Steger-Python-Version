@@ -170,7 +170,7 @@ def main():
         "seed": 20261104,
         "halcon_comparison": "NOT RUN: native licensed reference unavailable",
         "truth": "continuous geometric centerline; independent pixel-area image integration",
-        "scope": "specified synthetic profile models only; no real sperm ROI/mask provided",
+        "scope": "specified synthetic profile models only; real-image output equivalence is evaluated separately",
         "cases": results,
         "circle": circle,
         "elapsed_seconds": time.perf_counter() - start,

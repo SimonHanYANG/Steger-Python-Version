@@ -9,11 +9,57 @@ from .types import Contour, Junction
 def orient_normals(points, normals):
     if len(points) < 2:
         return normals.copy()
-    tangent = np.gradient(points, axis=0)
+    # Same unit-spacing first-order boundary / centered interior differences as
+    # np.gradient, avoiding its general N-D argument processing for short paths.
+    points = np.asarray(points)
+    if points.dtype.kind not in "fc":
+        points = points.astype(np.float64)
+    tangent = np.empty_like(points)
+    tangent[1:-1] = (points[2:] - points[:-2]) / 2.0
+    tangent[0] = points[1] - points[0]
+    tangent[-1] = points[-1] - points[-2]
     right = np.column_stack([tangent[:, 1], -tangent[:, 0]])
     out = normals.copy()
     out[np.einsum("ij,ij->i", out, right) < 0] *= -1
     return out
+
+
+def _neighbor_graph(points, normals, neighbors):
+    """Batch the original two-coordinate norm/dot/arccos edge scoring.
+
+    Keep i/sign order and the original (score, j) tie break when inserting
+    undirected edges, so Python set traversal and contour ordering stay intact.
+    """
+    graph = [set() for _ in points]
+    ii = np.repeat(np.arange(len(points)), [len(x) for x in neighbors])
+    jj = np.concatenate(neighbors).astype(np.intp, copy=False)
+    other = ii != jj
+    ii, jj = ii[other], jj[other]
+    if not len(ii):
+        return graph
+    delta = points[jj] - points[ii]
+    distance = np.linalg.norm(delta, axis=1)
+    tangent = np.column_stack((-normals[ii, 1], normals[ii, 0]))
+    projection = np.einsum("ij,ij->i", delta, tangent)
+    advance = np.abs(projection)
+    valid = (advance >= 0.22) & (advance / distance >= 0.5)
+    ii, jj = ii[valid], jj[valid]
+    distance, projection = distance[valid], projection[valid]
+    cosine = np.abs(np.einsum("ij,ij->i", normals[ii], normals[jj]))
+    angle = np.arccos(np.minimum(cosine, 1.0))
+    valid = angle <= np.pi / 3
+    ii, jj, projection = ii[valid], jj[valid], projection[valid]
+    if not len(ii):
+        return graph
+    scores = distance[valid] + angle[valid]
+    sign = (projection >= 0).astype(np.int8)
+    order = np.lexsort((jj, scores, sign, ii))
+    ii, jj, sign = ii[order], jj[order], sign[order]
+    first = np.r_[True, (ii[1:] != ii[:-1]) | (sign[1:] != sign[:-1])]
+    for i, j in zip(ii[first].tolist(), jj[first].tolist(), strict=True):
+        graph[i].add(j)
+        graph[j].add(i)
+    return graph
 
 
 def link_points(points, normals, responses, high):
@@ -23,36 +69,22 @@ def link_points(points, normals, responses, high):
     # Several pixels may describe essentially the same subpixel line point.
     tree = cKDTree(points)
     keep = np.ones(len(points), dtype=bool)
+    # Query dispatch is expensive for short necks. Batch small clouds; retain
+    # the sequential path for large/dense inputs to bound temporary storage.
+    duplicates = (
+        tree.query_ball_point(points, 0.22, return_sorted=False) if len(points) <= 512 else None
+    )
     for i in np.argsort(-responses, kind="stable"):
         if keep[i]:
-            for j in tree.query_ball_point(points[i], 0.22):
+            for j in (
+                duplicates[i] if duplicates is not None else tree.query_ball_point(points[i], 0.22)
+            ):
                 if j != i:
                     keep[j] = False
     points, normals, responses = points[keep], normals[keep], responses[keep]
     tree = cKDTree(points)
     neighbors = tree.query_ball_point(points, 1.85)
-    graph = [set() for _ in points]
-    for i, adjacent in enumerate(neighbors):
-        tangent = np.array([-normals[i, 1], normals[i, 0]])
-        for sign in (-1, 1):
-            choices = []
-            for j in adjacent:
-                if i == j:
-                    continue
-                delta = points[j] - points[i]
-                distance = np.linalg.norm(delta)
-                advance = np.dot(delta, tangent) * sign
-                if advance < 0.22 or advance / distance < 0.5:
-                    continue
-                cosine = np.clip(abs(np.dot(normals[i], normals[j])), 0, 1)
-                angle = np.arccos(cosine)
-                if angle > np.pi / 3:
-                    continue
-                choices.append((distance + angle, j))
-            if choices:
-                j = min(choices)[1]
-                graph[i].add(j)
-                graph[j].add(i)
+    graph = _neighbor_graph(points, normals, neighbors)
     active = np.zeros(len(points), dtype=bool)
     seen = set()
     for i in range(len(points)):
@@ -77,20 +109,20 @@ def link_points(points, normals, responses, high):
         path = [start]
         prev, cur = start, second
         while True:
-            used.add(tuple(sorted((prev, cur))))
+            used.add((prev, cur) if prev < cur else (cur, prev))
             path.append(cur)
             if len(graph[cur]) != 2 or cur == start:
                 break
             nxt = next(j for j in graph[cur] if j != prev)
-            if tuple(sorted((cur, nxt))) in used:
+            if ((cur, nxt) if cur < nxt else (nxt, cur)) in used:
                 break
             prev, cur = cur, nxt
         if len(path) >= 2:
             ids = np.asarray(path)
             idx = len(contours)
-            p, n = points[ids].copy(), normals[ids].copy()
+            p, n = points[ids], normals[ids]
             contours.append(
-                Contour(p, orient_normals(p, n), responses[ids].copy(), closed=path[0] == path[-1])
+                Contour(p, orient_normals(p, n), responses[ids], closed=path[0] == path[-1])
             )
             for k in (path[0], path[-1]):
                 membership.setdefault(k, set()).add(idx)
@@ -100,7 +132,7 @@ def link_points(points, normals, responses, high):
     starts += [i for i in range(len(points)) if active[i] and len(graph[i]) == 2]
     for i in starts:
         for j in sorted(graph[i]):
-            if tuple(sorted((i, j))) not in used:
+            if ((i, j) if i < j else (j, i)) not in used:
                 trace(i, j)
     junctions = [
         Junction(points[k].copy(), tuple(sorted(v))) for k, v in membership.items() if len(v) > 1

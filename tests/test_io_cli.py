@@ -49,7 +49,12 @@ def test_cli_round_trip_and_explicit_neck_measurement(tmp_path):
     )
     assert status == 0
     data = json.loads(output.read_text())
-    assert data["neck_measurement"]["angle_deg"] < 0.01
+    from steger import Contour, measure_bending
+    raw=data['contours'][0]
+    contour=Contour(np.column_stack([raw['row'],raw['col']]),
+                    np.column_stack([raw['normal_row'],raw['normal_col']]),np.array(raw['response']))
+    assert data["neck_measurement"]["angle_deg"] == measure_bending(contour).angle_deg
+    assert data['neck_measurement']['method'] == 'geometry_arclength_direction_range_v2'
     assert data["diagnostics"]["halcon_parity"] == "not_verified"
     assert len(data["image_sha256"]) == 64
     assert Image.open(overlay).size == (144, 144)

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "steger-precision"
-version = "1.0.0"
+version = "1.0.2"
 description = "Float64 Steger line extraction with explicit accuracy validation"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -12,12 +12,13 @@ dependencies = ["numpy>=2.0", "scipy>=1.14", "pillow>=11"]
 
 [project.urls]
 Repository = "https://github.com/SimonHanYANG/Steger-Python-Version"
-Documentation = "https://github.com/SimonHanYANG/Steger-Python-Version/blob/main/README.md"
+Documentation = "https://github.com/SimonHanYANG/Steger-Python-Version/blob/v1.0.2/README.md"
 Releases = "https://github.com/SimonHanYANG/Steger-Python-Version/releases"
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "matplotlib>=3.9"]
 visualization = ["matplotlib>=3.9"]
+native = ["cython>=3.0", "setuptools>=75"]
 halcon = ["mvtec-halcon"]
 
 [project.scripts]
@@ -25,13 +26,17 @@ steger = "steger.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/steger"]
+exclude = ["**/*.pyd", "**/*.so"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"THIRD_PARTY_NOTICES.md" = "steger/THIRD_PARTY_NOTICES.md"
 
 [tool.hatch.build.targets.sdist]
 include = [
   "src/steger", "tools", "tests", "docs", "README.md", "README.zh-CN.md",
-  "CHANGELOG.md", "pyproject.toml", "uv.lock", ".python-version",
+  "CHANGELOG.md", "pyproject.toml", "uv.lock", ".python-version", "THIRD_PARTY_NOTICES.md",
   "reports/accuracy.json", "reports/accuracy-summary.md", "reports/noise-validation.png",
-  "reports/examples", "reports/visualizations", "reports/process",
+  "reports/examples", "reports/visualizations", "reports/process", "reports/performance", "reports/performance-followup",
 ]
 
 [tool.pytest.ini_options]

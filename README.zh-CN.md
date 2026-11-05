@@ -2,7 +2,20 @@
 
 [English](README.md) | **简体中文**
 
-**稳定版：[v1.0](https://github.com/SimonHanYANG/Steger-Python-Version/releases/tag/v1.0)** · Python 包版本 `1.0.0` · [发布说明（英文）](docs/releases/v1.0.md)
+**当前测角口径：**默认采用有效中心线的“等弧长局部几何方向范围”，修正原始法向角周期跳变，并检查异常末端。
+[改进规则与使用方法](docs/robust-neck-angle.md)。旧C++口径保留为显式 `measure_cpp_bending()`。
+下文已发布版本和历史报告中的两端拟合角度属于旧口径，不能当作当前结果。
+
+**稳定版：[v1.0.2](https://github.com/SimonHanYANG/Steger-Python-Version/releases/tag/v1.0.2)** · Python 包版本 `1.0.2` · [发布说明](docs/releases/v1.0.2.md)
+
+已确认效果的几何测角和加速版本现发布到 `main`。旧main完整保存在
+[`archive/main-before-v1.0.2-20261105`](https://github.com/SimonHanYANG/Steger-Python-Version/tree/archive/main-before-v1.0.2-20261105)。
+获得本机测得的低延迟，需要从源码构建可选定位加速模块，并持续复用
+`NeckAngleWorker(workers=5)`；通用wheel默认使用Python/SciPy计算。
+[构建与集成说明](docs/low-latency-worker.md)。
+
+之前的纯加速对照保存在[历史性能记录](reports/performance-followup/README.md)，
+其中旧角度和耗时不代表本版几何测角结果。
 
 以定位和测量精度为优先的 Python Steger 曲线提取实现，可直接处理灰度 ROI，并用分割 mask 筛选目标。不需要 HALCON、不提供 UI。
 
@@ -55,9 +68,9 @@ uv run --extra visualization python tools/analyze_necks.py neck_mask \
   --output reports/neck-analysis/results
 ```
 
-本地输出包含可筛选的 `index.html`、全部角度 `angles.csv`、逐张测量叠加图、Hessian/法向/亚像素定位过程图、参数敏感性图，以及 `visualizations.zip`。脚本在五个明确记录的尺度下检查亮线和暗线，根据 mask 内覆盖范围及参考尺度选择中心线，选择过程不使用角度大小，并保存所有候选信息。若初次搜索覆盖或长度不足，则追加三个更大尺度；选中追加尺度的结果一律标记需复核，以检查平滑对细节的影响。测量的是可见颈部自身弯曲：沿同一行进方向，拟合 5–25% 与 75–95% 弧长窗口，直线为 0°。
+本地输出包含 `index.html`、全部角度 `angles.csv`、逐张叠加图、中间过程图、敏感性图和 `visualizations.zip`。脚本以5种平滑程度检查亮线和暗线，必要时补试3种更强的平滑。按覆盖范围和参考平滑程度选线，不按角度大小选择。测角取有效中心线各段拟合方向的变化范围，直线为0°，具体规则见[几何测角说明](docs/robust-neck-angle.md)。
 
-覆盖不足或过短时，主角度留空，只保留单独标记的局部段诊断角度。主角度衡量两端方向差，S 形反向弯折可能相互抵消；另附累计转角诊断值，但该值容易受局部定位波动影响。覆盖、长度与敏感性规则用于筛查，不能视为已验证的精度或置信区间。本批量策略关闭线宽偏差校正和额外原始灰度轮廓拟合，因为相关模型尚未在所提供的成像类型上验证。解释估计值前需检查 mask、中心线位置、图像截断与参数敏感性。默认真实数据目录中的原图和结果均排除在 Git 之外。
+覆盖不足或过短时，主角度留空，只保留单独标记的局部段诊断角度。主角度取沿有效中心线的局部几何方向范围，包含中部弯折，避免S形两端同向相互抵消。覆盖、长度与敏感性规则用于筛查，不能视为已验证的精度或置信区间。本批量策略关闭线宽偏差校正和额外原始灰度轮廓拟合，因为相关模型尚未在所提供的成像类型上验证。解释估计值前需检查 mask、中心线位置、图像截断与参数敏感性。默认真实数据目录中的原图和结果均排除在 Git 之外。
 
 对已有本地批量结果测量计算耗时，输入解码和磁盘读写均在计时区间之外：
 
@@ -75,6 +88,15 @@ uv run --extra visualization python tools/benchmark_roi_worker.py
 
 该测试将 RGB 转灰度、mask 处理、Steger 提取、中心线选择和角度计算全部纳入一个工作线程的计时。自动模式复现批处理的搜索及质量判断，每张图不使用预先保存的参数或曲线索引。另测固定全局尺度模式，同时报告速度、返回角度的样本数及与自动结果的差异。处理时间与线程提交至返回的时延分别保存在 `reports/neck-analysis/worker-runtime/`；分割计算及与分割同时运行时的负载竞争未计入。
 
+## 可选低延迟部署
+
+本地优化增加了可选的 float64 Cython 插值/Newton 模块，以及
+`steger.worker.NeckAngleWorker`：用五个常驻 CPU 进程并行计算原有独立尺度，
+通过共享内存接收同一对 ROI/mask。全部搜索、拟合与质量规则保留。
+这与单线程 `measure_neck()` 的 CPU 资源需求不同；需要先构建可选模块并预热，
+不能将平均耗时视为每次请求的上限。
+[构建、Windows 主入口保护、数值验证与集成说明](docs/low-latency-worker.md)。
+
 ## 安装
 
 项目使用 uv 和 Python 3.12：
@@ -87,6 +109,21 @@ uv run steger --help
 依赖 NumPy、SciPy 和 Pillow；开发检查额外使用 pytest。`uv.lock` 固定依赖版本。所有定位、卷积和拟合运算采用 `float64`，不自动归一化图像强度，不改变像素尺寸。
 
 ## 直接在 Python 中调用
+
+使用与真实图像批处理相同的自动搜索策略时，可将分割线程得到的数组直接传入：
+
+```python
+from steger import measure_neck
+
+result = measure_neck(roi, mask)
+print(result["angle_deg"], result["status"])
+```
+
+该接口不读图、不绘图，不依赖 matplotlib；保留完整尺度搜索及质量检查。
+片段不足或过短时 `angle_deg` 为 `None`，检测到的片段同时返回拟合与敏感性诊断。
+详细接口见[线程测量与复现说明（英文）](docs/performance.md)。
+
+需要自行指定一般检测参数时：
 
 ```python
 from steger import lines_gauss, measure_bending
@@ -134,7 +171,7 @@ uv run steger detect roi.tif --mask neck_mask.png \
   --no-complete-junctions --measure-neck --output neck.json --overlay neck.png
 ```
 
-输入支持 PNG/TIFF 等 Pillow 可读图像及 `.npy` 数组；RGB 图像在 I/O 层显式转为亮度，核心接口仅接受单通道图像。16 位和浮点灰度输入保留其原始数值范围。mask 必须与 ROI 尺寸和坐标一致；不进行自动拉伸或配准。
+输入支持 PNG/TIFF 等 Pillow 可读图像及 `.npy` 数组；RGB 图像在 I/O 层显式转为亮度，`lines_gauss` 仅接受单通道图像，`measure_neck` 也接受 RGB(A) 数组。16 位和浮点灰度输入保留其原始数值范围。mask 必须与 ROI 尺寸和坐标一致；不进行自动拉伸或配准。
 
 **mask 只限制候选中心线的位置，不把 mask 外的原图设为黑色。**卷积和截面拟合保留周围真实灰度，避免人为边界影响亚像素测量。叠加图的对比度调整只用于显示。
 
@@ -150,7 +187,7 @@ uv run steger detect roi.tif --mask neck_mask.png \
 | 不对称校正 | `bar-shaped`、`parabolic`、`gaussian` 的连续模型与数值求逆 |
 | 精度增强 | 原始灰度上的像素面积积分截面拟合，可关闭 |
 | 交汇补全 | 保守的端点延伸与目标曲线分割；推断点明确标记 |
-| 颈部自身弯曲 | 固定弧长窗口中的正交直线拟合；直线为 0° |
+| 颈部自身弯曲 | 等弧长局部几何方向范围，含末端质量与窗口敏感性检查 |
 | 精度验证 | 独立的连续几何图像生成、误差报告、回归测试 |
 
 输出曲线包含 `points`（row、column）、朝曲线右侧的 `normals`、`response`、`width_left`、`width_right`，启用校正时还包含 `asymmetry`、`contrast`。`angle` 属性遵循 HALCON 文档：相对于正 row 轴逆时针计量，单位为弧度，**是法线方向，不是弯曲角度**。
@@ -214,9 +251,9 @@ uv run steger compare candidate.json reference.json --output comparison.json
 
 ## 颈部角度的定义
 
-默认排除首尾各 5% 弧长，在两端各取总弧长的 20% 拟合方向。两段方向统一后求偏转角，范围 `[0°,180°]`，直线为 0°。参数可调整，跨样本应保持同一规则。输出包含窗口位置、拟合残差及累计转角。
+默认检查中心线异常末端，在有效中心线5–95%范围内，以20%总弧长的滑动窗口拟合局部方向。统一遍历方向、展开角度周期后取最大值减最小值，直线为0°。输出包含拟合窗口、方向序列、残差、原始点数、排除点索引及质量标记。
 
-测量的是两段拟合方向之差，不等于数学曲线端点处的瞬时切线夹角。S 形曲线需要结合累计转角；累计转角对噪声和采样尺度敏感。颈部过短、曲线闭合或包含推断交汇点时会拒绝直接测角。
+测量的是平滑局部方向的变化范围，不等于端点瞬时切线夹角，也不是逐点绝对转角累加。不强制折叠大角度或删除中部弯折。拟合窗口不足3px、有效覆盖不足75%、闭合或包含推断交汇点时拒绝完整测角。此前两端拟合与旧C++原始法向角算法分别保留为 `measure_end_direction_bending()`、`measure_cpp_bending()`，方便对照。
 
 ## 参考与范围
 

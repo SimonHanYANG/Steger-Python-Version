@@ -18,6 +18,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -34,25 +38,30 @@ jobs:
         env:
           INPUT_TAG: ${{ inputs.tag }}
         run: |
-          uv run --frozen --extra dev python - <<'PY'
+          python - <<'PY'
           import os
+          import re
+          import subprocess
           import tomllib
           from pathlib import Path
 
-          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
           if os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch":
               tag = os.environ["INPUT_TAG"]
           elif os.environ["GITHUB_REF_TYPE"] == "tag":
               tag = os.environ["GITHUB_REF_NAME"]
           else:
-              tag = "v" + version.removesuffix(".0")
-          assert tag in {"v" + version, "v" + version.removesuffix(".0")}
+              version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
+              tag = "v" + version
+          assert re.fullmatch(r"v[0-9]+\.[0-9]+(?:\.[0-9]+)?", tag), "Invalid release tag"
+          ref = "refs/tags/" + tag
+          commit = subprocess.check_output(["git", "rev-parse", "--verify", ref + "^{commit}"], text=True).strip()
+          subprocess.run(["git", "checkout", "--detach", ref], check=True)
           with open(os.environ["GITHUB_ENV"], "a") as stream:
               stream.write("RELEASE_TAG=" + tag + "\n")
+              stream.write("RELEASE_COMMIT=" + commit + "\n")
           PY
       - name: Verify tagged version
         run: |
-          git checkout "$RELEASE_TAG"
           uv run --frozen --extra dev python - <<'PY'
           import os
           import tomllib
@@ -65,7 +74,16 @@ jobs:
           assert tag in {"v" + version, "v" + version.removesuffix(".0")}
           assert (Path("docs/releases") / (tag + ".md")).is_file()
           PY
+      - name: Build optional native module
+        run: |
+          if [ -f tools/build_native.py ]; then
+            uv run --frozen --extra dev --extra native python tools/build_native.py
+          fi
       - name: Run tests
+        run: uv run --frozen --extra dev pytest -q
+      - name: Validate Python fallback
+        env:
+          STEGER_DISABLE_NATIVE: "1"
         run: uv run --frozen --extra dev pytest -q
       - name: Build wheel and source archive
         run: uv build
@@ -92,7 +110,7 @@ jobs:
             gh release upload "$RELEASE_TAG" dist/*.whl dist/*.tar.gz dist/SHA256SUMS --clobber
           else
             gh release create "$RELEASE_TAG" dist/*.whl dist/*.tar.gz dist/SHA256SUMS \
-              --verify-tag --draft --title "Steger Python $RELEASE_TAG" \
+              --verify-tag --target "$RELEASE_COMMIT" --draft --title "Steger Python $RELEASE_TAG" \
               --notes-file "docs/releases/$RELEASE_TAG.md"
           fi
           gh release edit "$RELEASE_TAG" --draft=false --latest

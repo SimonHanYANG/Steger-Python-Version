@@ -72,8 +72,7 @@ def automatic_search(case):
     selected = batch.choose_candidate(candidates)
     if selected is None:
         return {"status": "no_line", "angle_deg": None}
-    result = batch.detect(case["image"], geometry["mask"], selected["sigma"], selected["polarity"])
-    return batch.assess(result.contours[selected["contour_index"]], selected, candidates)
+    return batch.assess(selected.contour, selected, candidates)
 
 
 def statistics(milliseconds):
