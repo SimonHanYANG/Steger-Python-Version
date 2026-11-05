@@ -1,0 +1,75 @@
+{
+  "release_tag": "v1.0.2",
+  "package_version": "1.0.2",
+  "prepared_utc": "2026-11-05T12:51:36.379418+00:00",
+  "accepted_implementation_branch": "perf/angle-worker-v1.0.1",
+  "accepted_snapshot_commit": "a16befd",
+  "main_merge_commit": "fc39afca76050604c47fdc7caf85e377b6544e32",
+  "archived_main_branch": "archive/main-before-v1.0.2-20261105",
+  "archived_main_commit": "94235b04db2ebb0714503069dff9eef0416cc3f4",
+  "accepted_source_comparison": "SHA-256 matches accepted benchmark, allowing only Git LF/CRLF normalization and initializer version change",
+  "initializer_change": "Only __version__: 1.0.2.dev0 -> 1.0.2",
+  "numerical_modules_sha256_lf": {
+    "src/steger/cli.py": "1e1eb9b336d9a8ca6f301ad35585eaa8a2f874776830a19bbe0e757f9fbbf9b7",
+    "src/steger/comparison.py": "71412d7d13afe25a66ffd7ba3b89346bf9c2573333a6a5042960ac3eacd93229",
+    "src/steger/derivatives.py": "8370ff45789f23cdf9b51fce4fc16f0583216819f162e8eadaddb10dbf391586",
+    "src/steger/detector.py": "5f6a1395db9e428b328dc464779e9a6cb794c65e442dff1c02b01e506ebc299d",
+    "src/steger/io.py": "ad56134d24662853461b4ef9beff0e4b84b76b4f47e51216a9986ca69b2ebc8f",
+    "src/steger/linking.py": "420bcd30c640443d12b6cba9d926e17433c0d2fd95e8ea28a7c9419bd1784ccc",
+    "src/steger/measurement.py": "7bf6f72a6aff7032051524db8006c080910d5c99061fa63cc0ee249c5d350b9c",
+    "src/steger/neck.py": "cd241b3eb0b0d81801519ba145246b36971d6ebd4bd1fa1ce907f26bfd1517eb",
+    "src/steger/profiles.py": "bd235000e4cee461516d464a7a9dfe631d0a158e0e2cb49562dc73fe580180a7",
+    "src/steger/refinement.py": "612fdb89e4cbeb11ccb8ae0568fd78aa39712c4c8969ee11b0e73e0c5090fbc7",
+    "src/steger/robust_measurement.py": "43791852c25db84928e2033d7380c22afff26a7932752b47c6538b0534ebb582",
+    "src/steger/synthetic.py": "041d091c8abe529d5b29237de189f53aafff2a537031236fb2fe4331bf3357ec",
+    "src/steger/types.py": "0f0e868aaeda291047d78481a279d9955463238c458c9ce9c2bce77164480186",
+    "src/steger/visualization.py": "680ba3f4d2135e9bf11bcccf4b3a9c2518240b956adf2097a982392ae547cf53",
+    "src/steger/width.py": "8aac134cec9f511e2bfaf514cb610cd19f5239d5f19dbb9211f6bfb176d79a48",
+    "src/steger/worker.py": "0841579d50be90b5f5e4e9608e8baeccf39bbbd4d4fdcec1cc55bfdac95ea333"
+  },
+  "native_source_sha256_lf": "0e39864ed33d4dd4783b70bac1a4b9b8a97eb24e9c038320782d6a69b7874116",
+  "automated_tests": {
+    "command": "uv run --frozen --extra dev --extra native pytest -q",
+    "passed": 191
+  },
+  "real_image_validation": {
+    "cases": 29,
+    "release_outputs_equal_accepted_outputs": true,
+    "raw_detections_bitwise_unchanged": true,
+    "serial_parallel_outputs_equal": true,
+    "native_fallback_outputs_equal": true,
+    "final_angles": 26,
+    "missing_angles": 3
+  },
+  "runtime": {
+    "cpu": "Intel Core i5-12500",
+    "shape": [
+      64,
+      64
+    ],
+    "processes": 5,
+    "native_enabled": true,
+    "calls": 1740,
+    "mean_ms": 5.590926034482759,
+    "median_ms": 4.962249999999999,
+    "p95_ms": 9.603984999999998,
+    "max_ms": 20.8547,
+    "scope": "resident raw 64x64 RGB uint8 ROI and uint8 mask; full detection, measurement, quality checks and IPC; one angle thread + 5 persistent processes; excludes file I/O, segmentation, plotting, startup, backlog and external concurrent segmentation load"
+  },
+  "package_validation": {
+    "wheel_and_sdist_built": true,
+    "native_sources_and_notices_present": true,
+    "universal_wheel_has_no_platform_binaries": true,
+    "isolated_wheel_install_and_measurement_passed": true,
+    "real_images_and_local_reports_excluded": true
+  },
+  "environment": {
+    "python": "3.12.13",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "numpy": "2.5.4"
+  },
+  "python_fallback_tests": {
+    "environment": "STEGER_DISABLE_NATIVE=1",
+    "passed": 191
+  }
+}
