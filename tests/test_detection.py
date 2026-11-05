@@ -81,17 +81,21 @@ def test_circle_radius_and_bending_angle_with_known_truth():
     mask = (theta > 0.2) & (theta < 1.8) & (abs(np.hypot(rr - center[0], cc - center[1]) - 30) < 3)
     c = main_contour(lines_gauss(image, 1.5, 0.5, 2, "light", True, "gaussian", False, mask=mask))
     assert np.percentile(abs(np.linalg.norm(c.points - center, axis=1) - 30), 95) < 0.01
-    measurement = measure_bending(c)
+    from steger import measure_end_direction_bending
+    measurement = measure_end_direction_bending(c)
     angles = np.unwrap(np.arctan2(c.rows - center[0], c.cols - center[1]))
     # The explicit fit windows span 70% of the arc between their midpoints.
     expected = abs(np.rad2deg(angles[-1] - angles[0])) * 0.7
     assert abs(measurement.angle_deg - expected) < 0.1
+    assert abs(measure_bending(c).angle_deg - expected) < 0.1
 
 
 def test_symmetric_straight_neck_is_zero_not_180_degrees():
+    from steger import measure_end_direction_bending, measure_direction_angles
     image, _ = straight_line(shape=(64, 64), model="gaussian", angle_deg=39)
     c = main_contour(lines_gauss(image, 1.5, 0.5, 2, "light", True, "gaussian", False))
-    assert measure_bending(c).angle_deg < 0.01
+    assert measure_end_direction_bending(c).angle_deg < 0.01
+    assert measure_bending(c).angle_deg < .01
 
 
 def test_hysteresis_rejects_no_high_seed():

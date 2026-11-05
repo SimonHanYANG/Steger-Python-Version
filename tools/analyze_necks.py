@@ -49,6 +49,13 @@ STATUS_ZH = {
 FLAG_ZH = {
     "insufficient_span_coverage": "中心线主轴投影覆盖不足 75%",
     "fit_windows_shorter_than_3px": "端部拟合窗口不足 3 像素",
+    "insufficient_direction_samples": "可用中心线过短或未通过几何质量检查",
+    "terminal_samples_excluded": "末端方向不一致，已标记排除点",
+    "terminal_direction_requires_review": "末端方向与法向存在较大差异",
+    "nonlinear_fit_window": "局部窗口偏离直线较大",
+    "abrupt_local_direction_change": "相邻拟合方向变化过大",
+    "duplicate_samples_ignored": "已忽略重复坐标",
+    "insufficient_trusted_span_coverage": "排除异常末端后覆盖不足75%",
     "insufficient_comparable_scales": "具有相近覆盖范围的可比较尺度不足两个",
     "scale_sensitive_over_5deg": "尺度变化导致角度差超过 5°",
     "window_sensitive_over_5deg": "拟合窗口变化导致角度差超过 5°",
@@ -87,7 +94,38 @@ def _sample(contour, q):
 
 
 def _draw_measurement(axis, contour, measurement):
+    if measurement.get('method') == 'geometry_arclength_direction_range_v2':
+        p=contour.points
+        axis.plot(p[:,1],p[:,0],color='#aaaaaa',lw=1)
+        lo,hi=measurement['valid_point_start'],measurement['valid_point_stop']
+        axis.plot(p[lo:hi,1],p[lo:hi,0],color='#36ff83',lw=1.3)
+        excluded=np.asarray(measurement['excluded_indices'],dtype=int)
+        if len(excluded):
+            axis.scatter(p[excluded,1],p[excluded,0],marker='x',s=26,c='#e54435',zorder=8)
+        for window,key,color in [('min_window_arc_px','direction_min','#ffbf47'),
+                                  ('max_window_arc_px','direction_max','#ff6be5')]:
+            samples=_sample(contour,np.linspace(*measurement[window],40))
+            center=samples.mean(axis=0);v=measurement[key]
+            axis.plot(samples[:,1],samples[:,0],color=color,lw=3)
+            axis.quiver(center[1],center[0],v[1]*7,v[0]*7,
+                        angles='xy',scale_units='xy',scale=1,color=color,width=.008)
+        return
     axis.plot(contour.cols, contour.rows, color="#36ff83", lw=1.3)
+    if measurement.get("method", "").startswith("cpp_legacy_"):
+        for window, angle, color in (
+            ("min_window", "min_angle_rad", "#ffbf47"),
+            ("max_window", "max_angle_rad", "#ff6be5"),
+        ):
+            lo, hi = measurement[window]
+            p = contour.points[lo:hi]
+            center = p.mean(axis=0)
+            theta = measurement[angle]
+            axis.plot(p[:, 1], p[:, 0], color=color, lw=3)
+            axis.quiver(center[1], center[0], 7*np.cos(theta), -7*np.sin(theta),
+                        angles="xy", scale_units="xy", scale=1, color=color, width=.008)
+        return
+    if not measurement:
+        return
     for key, direction, color in (
         ("start_window", "direction_start", "#ffbf47"),
         ("end_window", "direction_end", "#ff6be5"),
@@ -121,14 +159,14 @@ def _draw_axes(axis, contour):
 def save_measurement_figures(image, original_mask, geometry, contour, candidates, record, output):
     m = record["measurement"]
     main = record["angle_deg"]
-    angle_label = f"{main:.1f} deg" if main is not None else f"LOCAL ONLY: {m['angle_deg']:.1f} deg"
+    angle_label = f"{main:.1f} deg" if main is not None else "No complete-neck angle"
     fig, axs = plt.subplots(1, 3, figsize=(13, 5.1))
     _base(axs[0], image, original_mask, "Original ROI and supplied mask")
     if geometry["ignored_mask_pixels"]:
         axs[0].contour(geometry["mask"], levels=[0.5], colors=["#ffbf47"], linewidths=0.9)
     _base(axs[1], image, geometry["mask"], "Measured grayscale centerline and normals")
     _draw_axes(axs[1], contour)
-    _base(axs[2], image, geometry["mask"], "Two fitted directions along the neck")
+    _base(axs[2], image, geometry["mask"], "Minimum / maximum local fitted directions")
     _draw_measurement(axs[2], contour, m)
     fig.suptitle(f"{record['id']} | {angle_label} | {record['status']}", fontsize=16, y=0.98)
     fig.text(
@@ -137,7 +175,7 @@ def save_measurement_figures(image, original_mask, geometry, contour, candidates
         f"sigma={record['sigma']:g} px; {record['polarity']} ridge; "
         f"major-axis span coverage={record['span_coverage']:.0%}; "
         f"centerline length={contour.length:.1f} px\n"
-        "Straight = 0 deg. Fit windows: 5-25% and 75-95% of selected line arclength. "
+        "Geometry v2: arc-length local fits; continuous directions; validated tips. "
         "Cropped ROIs describe the visible segment only.",
         ha="center",
         fontsize=9,
@@ -161,7 +199,8 @@ def save_measurement_figures(image, original_mask, geometry, contour, candidates
         c = max(options, key=lambda x: (x["span_coverage"], x["centrality"]))
         p = c["points"]
         axs[0].plot(p[:, 1], p[:, 0], color=color, lw=0.9, label=f"{sigma:g}")
-        all_angles.append((sigma, c["local_angle_deg"], c["span_coverage"]))
+        if c["local_angle_deg"] is not None:
+            all_angles.append((sigma, c["local_angle_deg"], c["span_coverage"]))
     axs[0].legend(title="sigma (px)", fontsize=7, title_fontsize=8)
     if all_angles:
         a = np.asarray(all_angles)
@@ -180,15 +219,13 @@ def save_measurement_figures(image, original_mask, geometry, contour, candidates
         title="Scale sensitivity (labels = span coverage)",
     )
     axs[1].margins(y=0.25)
-    w = record["window_sensitivity"]
-    if w:
-        axs[2].plot(
-            [v["window_fraction"] for v in w], [v["angle_deg"] for v in w], "o-", color="#8c3eb0"
-        )
+    smooth = record.get("measurement", {}).get("direction_angles_rad", [])
+    if smooth:
+        axs[2].plot(np.rad2deg(smooth), color="#8c3eb0")
     axs[2].set(
-        xlabel="Fit-window arclength fraction",
-        ylabel="Angle (deg)",
-        title="Window sensitivity at selected scale",
+        xlabel="Local fit window index",
+        ylabel="Continuous tangent angle (deg)",
+        title="Geometric direction sequence",
     )
     for ax in axs[1:]:
         ax.grid(alpha=0.15)
@@ -243,7 +280,7 @@ def analyze_pair(image_path, mask_path, directory):
         )
         contour = result.contours[selected["contour_index"]]
         record.update({k: v for k, v in selected.items() if k not in ("points", "local_angle_deg")})
-        record.update(assess(contour, selected, candidates))
+        record.update(assess(contour, selected, candidates, geometry))
         record["candidate_search"] = [
             {k: v for k, v in c.items() if k != "points"} for c in candidates
         ]
@@ -271,203 +308,77 @@ def analyze_pair(image_path, mask_path, directory):
 
 
 def write_summary(rows, display_items, output):
+    """Concise report for the geometric bending measurement."""
     counts = dict(Counter(r["status"] for r in rows))
-    fields = [
-        "id",
-        "angle_deg",
-        "local_segment_angle_deg",
-        "status",
-        "sigma",
-        "polarity",
-        "span_coverage",
-        "length_px",
-        "centrality",
-        "cumulative_turn_diagnostic_deg",
-        "scale_min_deg",
-        "scale_max_deg",
-        "touches_roi_border",
-        "ignored_mask_pixels",
-        "quality_flags",
-    ]
+    fields = ["id", "angle_deg", "local_segment_angle_deg", "status", "sigma", "polarity",
+              "span_coverage", "length_px", "centrality", "touches_roi_border", "quality_flags"]
     with (output / "angles.csv").open("w", encoding="utf-8-sig", newline="") as stream:
         writer = csv.DictWriter(stream, fieldnames=fields)
         writer.writeheader()
         for r in rows:
             line = {key: r.get(key) for key in fields}
-            line["cumulative_turn_diagnostic_deg"] = r.get("measurement", {}).get(
-                "cumulative_turn_deg"
-            )
-            limits = r.get("scale_angle_range_deg") or (None, None)
-            line.update(scale_min_deg=limits[0], scale_max_deg=limits[1])
             line["quality_flags"] = ";".join(r.get("quality_flags", []))
             writer.writerow(line)
-    write_json(
-        output / "results.json",
-        {
-            "counts": counts,
-            "python": platform.python_version(),
-            "method": {
-                "target": "visible neck self-bending, straight=0deg; not head-neck angle",
-                "angle_interpretation": "end-window direction change, not maximum local bend; S-curves can cancel; cumulative turn is a noise-sensitive diagnostic",
-                "scales_px": SCALES,
-                "rescue_scales_px": RESCUE_SCALES,
-                "rescue_policy": "only when initial search has no contour meeting extent/length gates; every selected rescue scale requires review",
-                "low": LOW,
-                "high": HIGH,
-                "selection": "within 0.05 of maximum PCA span coverage; prefer candidates meeting extent/length gates if available, then sigma closest to 2, then centrality",
-                "mask": "largest 8-connected component; original intensities retained for convolution",
-                "windows": "trim 5%, fit next 20% at each end; orthogonal line fits",
-                "minimum_fit_window_length_px": 3,
-                "minimum_span_coverage": 0.75,
-                "scale_sensitivity_review_threshold_deg": 5,
-                "width_bias_profile_fitting": "disabled: not validated on this imaging modality",
-                "accuracy": "real-image ground truth and HALCON comparison unavailable; no accuracy guarantee",
-                "sensitivity": "parameter variation only; NOT confidence intervals or error bounds",
-            },
-            "results": rows,
-        },
-    )
+    method = {
+        "target": "visible neck self-bending; not head-neck alignment",
+        "angle_interpretation": "range of continuous geometric local TLS directions",
+        "window_fraction": .2, "trim_fraction": .05,
+        "angle_arithmetic": "float64; arc-length resampling; batched orthogonal fits",
+        "angle_unwrap": True, "minimum_window_length_px": 3,
+        "temporal_median": "separate NeckBendingHistory instance per tracked sperm",
+        "scales_px": SCALES, "rescue_scales_px": RESCUE_SCALES,
+        "low": LOW, "high": HIGH, "minimum_span_coverage": .75,
+        "mask": "largest 8-connected component; convolution retains original image",
+        "note": "same angle rule does not establish Python/HALCON centerline equivalence",
+    }
+    write_json(output / "results.json", dict(counts=counts, python=platform.python_version(),
+                                              method=method, results=rows))
     ncols = 4
     nrows = max(1, int(np.ceil(len(display_items) / ncols)))
-    fig, axes = plt.subplots(nrows, ncols, figsize=(15, 3.8 * nrows), squeeze=False)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(15, 3.8*nrows), squeeze=False)
     for ax, (record, image, mask, contour) in zip(axes.flat, display_items, strict=False):
         main = record.get("angle_deg")
-        local = record.get("local_segment_angle_deg")
-        value = (
-            f"{main:.1f} deg"
-            if main is not None
-            else f"LOCAL {local:.1f} deg"
-            if local is not None
-            else "No result"
-        )
-        _base(ax, image, mask, f"{record['id']} | {value}\n{record['status']}")
+        text = "No full angle" if main is None else f"{main:.2f} deg"
+        _base(ax, image, mask, f"{record['id']} | {text}\n{record['status']}")
         if contour is not None:
-            _draw_measurement(ax, contour, record["measurement"])
-    for ax in axes.flat[len(display_items) :]:
+            _draw_measurement(ax, contour, record.get("measurement", {}))
+    for ax in axes.flat[len(display_items):]:
         ax.axis("off")
-    fig.suptitle(
-        "Visible neck self-bending | 28 supplied ROI/mask pairs"
-        if len(rows) == 28
-        else f"Visible neck self-bending | {len(rows)} pairs",
-        fontsize=19,
-        y=0.998,
-    )
-    fig.tight_layout(rect=(0, 0, 1, 0.985))
+    fig.suptitle("Neck bending | geometric local direction range v2", fontsize=18, y=.998)
+    fig.tight_layout(rect=(0, 0, 1, .985))
     fig.savefig(output / "all-results.png", dpi=145, facecolor="white")
     plt.close(fig)
-
-    paragraphs = [
-        "# 颈部自身弯曲批量分析",
-        "",
-        f"共 {len(rows)} 对图像。状态统计："
-        + "；".join(f"{STATUS_ZH[k]} {v} 张" for k, v in counts.items())
-        + "。",
-        "",
-        "弯曲角定义：沿选中中心线的同一行进方向，在 5–25% 与 75–95% 弧长窗口分别进行正交直线拟合，两方向夹角，直线为 0°。不是头颈夹角，也不是最大局部折角。",
-        "",
-        "S 形或反向弯折可能使两端方向变化相互抵消，小角度不一定代表颈部很直。CSV 和下表另附累计转角诊断值（按约 1 像素尺度估计），该值容易受局部定位波动影响，不能直接当作高精度弯曲角或替代主角度。",
-        "",
-        "这是低分辨率真实灰度图上的估计，尚无人工中心线或 HALCON 对照真值。参数变化范围不是置信区间。图像触边时仅描述当前可见颈部。",
-        "",
-        "主角度仅在主轴投影覆盖率达到 75% 且每个拟合窗口至少 3 像素时给出；其他样本只保留局部段的诊断数值，不能代表完整颈部。75% 是本次筛查规则，不是已验证的准确度标准。",
-        "",
-        "初始检查 1、1.5、2、2.5、3 像素尺度；均无足够覆盖和长度时，追加 3.5、4、4.5 像素尺度，追加尺度的结果一律标记需复核，因为较强平滑可能改变细节。在最大覆盖率的 5 个百分点以内，优先保留符合覆盖和长度规则的候选（若有），再选择最接近 2 像素的高斯尺度，并检查暗线和亮线。选择过程不使用角度大小。mask 仅限定位置，卷积始终使用原始灰度。孤立 mask 小块排除但保留原图显示。",
-        "",
-        "本批次关闭线宽、不对称模型校正和额外灰度轮廓拟合，因为这些模型尚未在这类显微图像上验证。原始 Hessian 法向、Taylor/Newton 定位与连接过程均保存。",
-        "",
-        "- [全部角度 CSV](angles.csv)",
-        "- [全部结构化结果和分析规则](results.json)",
-        "- [全部可视化压缩包](visualizations.zip)",
-        "",
-        "![全部结果](all-results.png)",
-        "",
-        "| 图像 | 两端方向差 ° | 局部段诊断角度 ° | 累计转角诊断 ° | 状态 | 尺度变化范围 ° | 主轴投影覆盖率 | 图像触边 | 查看 |",
-        "|---|---:|---:|---:|---|---|---:|---|---|",
-    ]
+    paragraphs = ["# 几何方向范围颈部弯曲角", "",
+        "中心线端点质量检查 → 等弧长局部拟合 → 连续方向最大值减最小值。覆盖整条有效中心线的5–95%，窗口长为20%弧长，直线为0°。",
+        "", "拟合窗口不足3px或有效覆盖不足75%时不返回完整角度。红叉表示被排除的原始末端点，原始提取坐标保留。",
+        "", f"共{len(rows)}张：{counts}。", "",
+        "[全部角度CSV](angles.csv) · [结构化结果](results.json) · [可视化ZIP](visualizations.zip)", "",
+        "| 图像 | 角度 ° | 状态 | 查看 |", "|---|---:|---|---|"]
     cards = []
-    table = []
     for r in rows:
         identifier = r["id"]
-        main = "—" if r.get("angle_deg") is None else f"{r['angle_deg']:.1f}"
-        local = (
-            "—"
-            if r.get("local_segment_angle_deg") is None
-            else f"{r['local_segment_angle_deg']:.1f}"
-        )
-        limits = r.get("scale_angle_range_deg")
-        spread = "—" if limits is None else f"{limits[0]:.1f}–{limits[1]:.1f}"
-        coverage = f"{r.get('span_coverage', 0):.0%}"
-        border = "是" if r.get("touches_roi_border") else "否"
+        angle = "—" if r.get("angle_deg") is None else f"{r['angle_deg']:.2f}"
         state = STATUS_ZH[r["status"]]
-        cumulative = r.get("measurement", {}).get("cumulative_turn_deg")
-        cumulative_text = "—" if cumulative is None else f"{cumulative:.1f}"
-        available = [
-            (name, title)
-            for name, title in (
-                ("measurement.png", "测量图"),
-                ("process/README.md", "中间过程"),
-                ("sensitivity.png", "敏感性"),
-            )
-            if (output / identifier / name).exists()
-        ]
-        report_links = " · ".join(f"[{title}]({identifier}/{name})" for name, title in available)
-        paragraphs.append(
-            f"| {identifier} | {main} | {local} | {cumulative_text} | {state} | {spread} | {coverage} | {border} | {report_links} |"
-        )
-        table.append(
-            f'<tr data-status="{r["status"]}"><td><a href="#{identifier}">{identifier}</a></td><td>{main}</td><td>{local}</td><td>{cumulative_text}</td><td>{state}</td><td>{spread}</td><td>{coverage}</td><td>{border}</td></tr>'
-        )
-        flags = (
-            "；".join(FLAG_ZH[k] for k in r.get("quality_flags", []))
-            or "未触发自动敏感性标记（不代表精度已验证）"
-        )
-        preview = (
-            f'<img loading="lazy" src="{identifier}/measurement.png" alt="测量叠加图">'
-            if (output / identifier / "measurement.png").exists()
-            else ""
-        )
-        arrays_link = (
-            f' · <a href="{identifier}/process/process.npz">导数及过程数组 NPZ</a>'
-            if (output / identifier / "process/process.npz").exists()
-            else ""
-        )
-        cards.append(
-            f'<section id="{identifier}" data-status="{r["status"]}"><h2>{identifier} · {main}° · {state}</h2>'
-            f"<p>局部段诊断值 {local}°；累计转角诊断 {cumulative_text}°；尺度变化 {spread}°；投影覆盖 {coverage}；触边 {border}。</p>"
-            f'<p class="muted">{html.escape(flags)}</p>{preview}'
-            f"<details><summary>展开法向与 Hessian 等中间过程，以及参数敏感性</summary>"
-            + "".join(
-                f'<a href="{identifier}/{name}"><img loading="lazy" src="{identifier}/{name}" alt="{name}"></a>'
-                for name in (
-                    "process/normals.png",
-                    "process/process-overview.png",
-                    "process/derivatives.png",
-                    "process/point-inspection.png",
-                    "sensitivity.png",
-                )
-                if (output / identifier / name).exists()
-            )
-            + f'</details><p><a href="{identifier}/result.json">原始坐标及测量 JSON</a>{arrays_link}</p></section>'
-        )
-    (output / "README.md").write_text("\n".join(paragraphs) + "\n", encoding="utf-8")
-    page = """<!doctype html><html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>颈部弯曲分析</title><style>
-    body{font-family:system-ui,sans-serif;margin:24px auto;padding:0 18px;max-width:1250px;color:#183047;background:#f4f7fb;line-height:1.7}h1,h2{line-height:1.3}section{background:white;padding:20px;margin:24px 0;border-radius:14px}img{display:block;width:100%;height:auto;margin:12px 0}table{width:100%;border-collapse:collapse;background:white;font-size:14px}td,th{border-bottom:1px solid #dce4ee;padding:9px;text-align:left}a{color:#185fc4}summary{cursor:pointer;font-weight:600;padding:12px 0}.muted{color:#596b7d}select{padding:8px;margin:10px 0}.scroll{overflow:auto}.note{padding:16px;background:#fff4d7;border-radius:10px}[hidden]{display:none!important}</style>
-    <h1>颈部自身弯曲分析</h1>
-    <p>直线为 0°；使用中心线两端内侧 20% 弧长窗口拟合，分别去除最外端 5%。测量目标为颈部自身弯曲。</p>
-    <p>主角度是两端方向差，S 形弯折可能相互抵消，小角度不一定代表颈部很直。另列累计转角诊断，该值对局部波动敏感，需结合图像查看。</p>
-    <p class="note">这些数值是当前可见灰度颈部段的估计，没有真值精度验证。主角度为空时，该段覆盖不足或过短；局部诊断角度不能代替完整颈部角度。尺度变化范围不是置信区间。触边图像仅描述 ROI 内可见部分。</p>
-    <p><a href="angles.csv">下载角度 CSV</a> · <a href="visualizations.zip">下载全部可视化</a> · <a href="README.md">完整方法及结果说明</a> · <a href="all-results.png">查看总览大图</a></p>
-    <label>显示：<select id="filter"><option value="all">全部结果</option><option value="estimated">可测估计</option><option value="review_required">需复核</option><option value="insufficient_segment">仅局部</option></select></label>
-    <div class="scroll"><table><thead><tr><th>图像</th><th>两端方向差 °</th><th>局部诊断 °</th><th>累计转角诊断 °</th><th>状态</th><th>尺度变化 °</th><th>投影覆盖</th><th>触边</th></tr></thead><tbody>"""
-    page += "".join(table) + "</tbody></table></div>" + "".join(cards)
-    page += """<script>document.querySelector('#filter').addEventListener('change',e=>{document.querySelectorAll('[data-status]').forEach(el=>el.hidden=e.target.value!=='all'&&el.dataset.status!==e.target.value)});</script></html>"""
-    (output / "index.html").write_text(page, encoding="utf-8")
-    with zipfile.ZipFile(
-        output / "visualizations.zip", "w", compression=zipfile.ZIP_DEFLATED
-    ) as archive:
+        figure = output / identifier / "measurement.png"
+        link = f"[{identifier}]({identifier}/measurement.png)" if figure.exists() else "—"
+        paragraphs.append(f"| {identifier} | {angle} | {state} | {link} |")
+        image = (f'<img loading="lazy" src="{identifier}/measurement.png" alt="{identifier}">'
+                 if figure.exists() else "")
+        flags = "；".join(FLAG_ZH.get(k, k) for k in r.get("quality_flags", []))
+        cards.append(f'<section id="{identifier}"><h2>{identifier} · {angle}° · {state}</h2>'
+                     f'<p>{html.escape(flags)}</p>{image}</section>')
+    (output / "README.md").write_text("\n".join(paragraphs)+"\n", encoding="utf-8")
+    page = '''<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>几何方向范围颈部弯曲角</title>
+    <style>body{font:16px/1.7 system-ui;max-width:1200px;margin:30px auto;padding:0 20px;color:#183047}section{padding:18px;border-bottom:1px solid #ddd}img{max-width:100%;height:auto}a{color:#185fc4}</style>
+    <h1>几何方向范围颈部弯曲角</h1><p>有效中心线5–95%范围内，以20%弧长窗口逐段拟合方向，展开周期后取方向范围。黄色与粉色表示最小、最大方向窗口，红叉表示被排除的末端点。</p>
+    <p>拟合窗口不足3px或有效覆盖不足75%时不返回完整角度。此报告是单帧结果，不混合不同精子的历史。</p>
+    <p><a href="angles.csv">角度CSV</a> · <a href="results.json">结构化结果</a> · <a href="all-results.png">总览图</a></p>'''
+    (output / "index.html").write_text(page+"".join(cards)+"</html>", encoding="utf-8")
+    with zipfile.ZipFile(output / "visualizations.zip", "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for path in sorted(output.rglob("*.png")):
             archive.write(path, path.relative_to(output))
     return counts
+
 
 
 def main(argv=None):

@@ -1,5 +1,7 @@
 """Public HALCON-shaped interface, implemented independently in Python/SciPy."""
 
+import os
+
 import numpy as np
 from scipy.ndimage import convolve1d, map_coordinates, spline_filter
 
@@ -9,6 +11,15 @@ from .linking import link_points
 from .refinement import refine_contour
 from .types import Contour, DetectionResult, DetectionTrace
 from .width import extract_widths
+
+try:
+    if os.environ.get("STEGER_DISABLE_NATIVE") == "1":
+        raise ImportError("Native sampling disabled explicitly")
+    from ._spline_native import refine_points as _native_refine_points
+    from ._spline_native import sample_fields as _native_sample_fields
+except ImportError:
+    _native_sample_fields = None
+    _native_refine_points = None
 
 
 def _boolean(value, name):
@@ -147,6 +158,7 @@ class _RidgeFields:
         )
         self.off = self.t[..., None] * self.normals
         self._coefficients = None
+        self._native_coefficients = None
 
     @property
     def coefficients(self):
@@ -155,6 +167,13 @@ class _RidgeFields:
                 k: spline_filter(v, order=3, mode="reflect") for k, v in self.derivatives.items()
             }
         return self._coefficients
+
+    @property
+    def native_coefficients(self):
+        if self._native_coefficients is None:
+            co = self.coefficients
+            self._native_coefficients = np.stack([co[k] for k in ("r", "c", "rr", "rc", "cc")])
+        return self._native_coefficients
 
 
 def _detect_neck_polarities(image, mask, sigma, low, high):
@@ -250,15 +269,24 @@ def _extract(
         )
     if refine and len(points):
         co = fields.coefficients
-        for _ in range(6):
-            d = {
-                k: map_coordinates(v, points.T, order=3, mode="reflect", prefilter=False)
-                for k, v in co.items()
-            }
+        native_co = fields.native_coefficients if _native_sample_fields is not None else None
+        if _native_refine_points is not None:
+            points, positions = _native_refine_points(native_co, points, ns, rc, trace is not None)
+            if trace is not None:
+                trace.newton_positions.extend(positions)
+        for _ in range(0 if _native_refine_points is not None else 6):
+            if native_co is None:
+                d = {
+                    k: map_coordinates(v, points.T, order=3, mode="reflect", prefilter=False)
+                    for k, v in co.items()
+                }
+                dr, dc, drr, drc, dcc = (d[k] for k in ("r", "c", "rr", "rc", "cc"))
+            else:
+                dr, dc, drr, drc, dcc = _native_sample_fields(native_co, points)
             a, b = ns[:, 0], ns[:, 1]
-            denom = d["rr"] * a * a + 2 * d["rc"] * a * b + d["cc"] * b * b
+            denom = drr * a * a + 2 * drc * a * b + dcc * b * b
             step = np.divide(
-                -(d["r"] * a + d["c"] * b),
+                -(dr * a + dc * b),
                 denom,
                 out=np.zeros(len(points)),
                 where=np.abs(denom) > 1e-14,

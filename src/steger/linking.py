@@ -24,6 +24,44 @@ def orient_normals(points, normals):
     return out
 
 
+def _neighbor_graph(points, normals, neighbors):
+    """Batch the original two-coordinate norm/dot/arccos edge scoring.
+
+    Keep i/sign order and the original (score, j) tie break when inserting
+    undirected edges, so Python set traversal and contour ordering stay intact.
+    """
+    graph = [set() for _ in points]
+    ii = np.repeat(np.arange(len(points)), [len(x) for x in neighbors])
+    jj = np.concatenate(neighbors).astype(np.intp, copy=False)
+    other = ii != jj
+    ii, jj = ii[other], jj[other]
+    if not len(ii):
+        return graph
+    delta = points[jj] - points[ii]
+    distance = np.linalg.norm(delta, axis=1)
+    tangent = np.column_stack((-normals[ii, 1], normals[ii, 0]))
+    projection = np.einsum("ij,ij->i", delta, tangent)
+    advance = np.abs(projection)
+    valid = (advance >= 0.22) & (advance / distance >= 0.5)
+    ii, jj = ii[valid], jj[valid]
+    distance, projection = distance[valid], projection[valid]
+    cosine = np.abs(np.einsum("ij,ij->i", normals[ii], normals[jj]))
+    angle = np.arccos(np.minimum(cosine, 1.0))
+    valid = angle <= np.pi / 3
+    ii, jj, projection = ii[valid], jj[valid], projection[valid]
+    if not len(ii):
+        return graph
+    scores = distance[valid] + angle[valid]
+    sign = (projection >= 0).astype(np.int8)
+    order = np.lexsort((jj, scores, sign, ii))
+    ii, jj, sign = ii[order], jj[order], sign[order]
+    first = np.r_[True, (ii[1:] != ii[:-1]) | (sign[1:] != sign[:-1])]
+    for i, j in zip(ii[first].tolist(), jj[first].tolist(), strict=True):
+        graph[i].add(j)
+        graph[j].add(i)
+    return graph
+
+
 def link_points(points, normals, responses, high):
     """Link only components containing a high-threshold seed. No binary thinning."""
     if not len(points):
@@ -46,37 +84,7 @@ def link_points(points, normals, responses, high):
     points, normals, responses = points[keep], normals[keep], responses[keep]
     tree = cKDTree(points)
     neighbors = tree.query_ball_point(points, 1.85)
-    graph = [set() for _ in points]
-    for i, adjacent in enumerate(neighbors):
-        tangent = np.array([-normals[i, 1], normals[i, 0]])
-        choices_by_sign = ([], [])
-        for j in adjacent:
-            if i == j:
-                continue
-            # The two directions use the identical distance and projection.
-            # Keep the original norm/dot arithmetic and lexicographic scores.
-            delta = points[j] - points[i]
-            distance = np.linalg.norm(delta)
-            projection = np.dot(delta, tangent)
-            # A finite projection can pass the positive advance gate in only
-            # one direction. abs is exactly the original projection * sign.
-            advance = abs(projection)
-            if advance < 0.22 or advance / distance < 0.5:
-                continue
-            cosine = abs(np.dot(normals[i], normals[j]))
-            # abs already enforces the lower clip bound; preserve float64
-            # and the original arccos/angle threshold, including ties.
-            if cosine > 1:
-                cosine = np.float64(1.0)
-            angle = np.arccos(cosine)
-            if angle > np.pi / 3:
-                continue
-            choices_by_sign[0 if projection < 0 else 1].append((distance + angle, j))
-        for choices in choices_by_sign:
-            if choices:
-                j = min(choices)[1]
-                graph[i].add(j)
-                graph[j].add(i)
+    graph = _neighbor_graph(points, normals, neighbors)
     active = np.zeros(len(points), dtype=bool)
     seen = set()
     for i in range(len(points)):

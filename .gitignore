@@ -10,4 +10,7 @@ reports/halcon/
 /neck_mask/
 /neck_mask.zip
 /reports/neck-analysis/
+/build/
+*.pyd
+*.so
 

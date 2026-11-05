@@ -2,18 +2,22 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
-**Stable release: [v1.0.1](https://github.com/SimonHanYANG/Steger-Python-Version/releases/tag/v1.0.1)** · Python package `1.0.1` · [Release notes](docs/releases/v1.0.1.md)
+**Current measurement update:** default bending uses the continuous local geometric
+direction range with arc-length windows and auditable terminal checks.
+See [measurement rules](docs/robust-neck-angle.md). The literal old C++ policy remains available as `measure_cpp_bending()`.
+Published endpoint-fit results below are historical and must be recalculated.
 
-The v1.0.1 release publishes the accepted faster `measure_neck(roi, mask)` worker
-from `perf/angle-worker-v1.0`, preserving the v1.0 measurement policy.
-See [runtime and exact-output comparisons](reports/performance/README.md) and
-[API / reproduction notes](docs/performance.md). The release is tagged directly
-from `perf/angle-worker-v1.0`; `main` remains unchanged.
+**Stable release: [v1.0.2](https://github.com/SimonHanYANG/Steger-Python-Version/releases/tag/v1.0.2)** · Python package `1.0.2` · [Release notes](docs/releases/v1.0.2.md)
 
-**Further performance work:** `perf/angle-worker-v1.0.1` (`1.0.2.dev0`) reduces
-linking overhead and uses compact masked Taylor fields, with frozen v1.0.1
-output comparisons. See [paired measurements](reports/performance-followup/README.md)
-and [implementation / reproduction notes](docs/performance-followup.md).
+The accepted geometric-angle and optional native/five-process worker are now on
+`main`. The previous main tip is preserved as
+[`archive/main-before-v1.0.2-20261105`](https://github.com/SimonHanYANG/Steger-Python-Version/tree/archive/main-before-v1.0.2-20261105).
+For the measured low-latency configuration, build the optional native module
+from source and reuse `NeckAngleWorker(workers=5)`; the universal wheel uses the
+Python/SciPy fallback. See [build and integration](docs/low-latency-worker.md).
+
+Earlier optimization-only comparisons remain in [performance history](reports/performance-followup/README.md).
+They predate the new angle definition and are not current-angle or current-runtime results.
 
 A precision-oriented Python implementation of Steger's curvilinear structure detector. It processes grayscale regions of interest (ROIs) and uses segmentation masks to select target structures. No HALCON installation or graphical interface is required.
 
@@ -66,9 +70,9 @@ uv run --extra visualization python tools/analyze_necks.py neck_mask \
   --output reports/neck-analysis/results
 ```
 
-The local report includes a filterable `index.html`, `angles.csv`, individual measurement overlays, Hessian/normal/subpixel process reports, parameter sensitivity plots, and `visualizations.zip`. The script searches bright and dark ridges at five declared scales, selects by mask extent and a reference scale rather than angle, and records every candidate. If that search yields insufficient extent or length, it checks three larger scales; any selected larger scale requires review for smoothing effects. It measures the visible neck's self-bending using directed fits over the 5–25% and 75–95% arclength windows; straight is 0 degrees.
+The local report includes `index.html`, `angles.csv`, measurement overlays, intermediate process figures, sensitivity plots and `visualizations.zip`. The script checks bright and dark lines at five smoothing strengths, with three larger strengths when needed. Selection uses extent and a reference strength, not angle magnitude. Bending is the range of continuous local fitted directions throughout the valid centerline; straight is zero.
 
-Incomplete or short centerlines receive no full-neck angle: their local diagnostic angle is stored separately. The primary angle measures end-direction change; reverse bends in an S-shaped neck can cancel. A separate cumulative-turn diagnostic is exported, but it is sensitive to local localization fluctuations. Extent/length checks and sensitivity flags are screening rules, not validated accuracy or confidence bounds. Width bias correction and the additional original-profile fit are disabled in this batch policy because those models have not been validated for the supplied imaging modality. Review masks, centerline placement, crop boundaries, and sensitivity before interpreting estimates. Input images and reports in the default real-data folders are excluded from Git.
+Incomplete or short centerlines receive no full-neck angle; a local diagnostic value stays separate. Interior fitted windows preserve S-shaped bending. Coverage, terminal consistency and sensitivity checks are screening rules, not validated error bounds. Width correction and extra profile fitting remain disabled for this batch policy. Real inputs and their local reports stay excluded from Git.
 
 To measure computation time on an existing local batch, with all input decoding and disk I/O outside the timers:
 
@@ -85,6 +89,15 @@ uv run --extra visualization python tools/benchmark_roi_worker.py
 ```
 
 This includes RGB conversion, mask processing, Steger extraction, contour selection, and angle calculation inside one worker thread. The adaptive mode reproduces the batch quality/search behavior without cached per-image parameters or contour indices. A separate fixed-global-scale mode reports speed, returned-angle counts, and differences from the adaptive results. Processing time and submit-to-result latency are reported separately in `reports/neck-analysis/worker-runtime/`; segmentation and simultaneous segmentation load are excluded.
+
+## Optional low-latency deployment
+
+Local optimization adds an optional float64 Cython interpolation/Newton module
+and `steger.worker.NeckAngleWorker`: five persistent CPU processes evaluate the
+existing independent scales using one shared ROI/mask workspace. All search,
+fitting and quality rules remain. This consumes different CPU resources from
+serial `measure_neck()`; build and warm the optional module first. Mean latency
+is not a per-request bound. See [build, validation and integration notes](docs/low-latency-worker.md).
 
 ## Installation
 
@@ -241,9 +254,9 @@ Comparison uses bidirectional point-to-segment distances so differences in conto
 
 ## Neck bending angle definition
 
-By default, the first and last 5% of arclength are excluded. A segment covering 20% of total arclength is fitted near each end. After aligning the traversal directions, their deflection angle is measured in `[0,180]` degrees, with a straight neck measuring 0 degrees. These parameters are configurable and should be kept consistent across samples. Outputs include the window locations, fitting residuals, and cumulative turning angle.
+Validate terminal geometry and fit 20%-arclength windows throughout the valid centerline's 5–95% interval. Align traversal directions, unwrap angles and report their maximum minus minimum, with straight measuring zero. Outputs include excluded original indices, local direction windows, residuals and quality flags.
 
-The measurement is the difference between two fitted segment directions, not the instantaneous tangent angle at the mathematical endpoints. For S-shaped contours, also inspect cumulative turning, which is sensitive to noise and sampling scale. Direct angle measurement is rejected for necks that are too short, closed contours, or contours containing inferred junction points.
+Interior windows retain S-shaped bending that endpoint differences can cancel. The measurement is a local direction range, not total absolute turning. Short windows, inadequate trusted coverage, closed contours and inferred junction points prevent a full measurement. Earlier methods remain explicit comparison APIs: `measure_end_direction_bending()` and `measure_cpp_bending()`.
 
 ## References and scope
 

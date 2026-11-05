@@ -1,7 +1,8 @@
 """v1.0 neck policy with reusable fields; no I/O or visualization dependencies.
 
 Measures bending of the visible grayscale neck centerline using aligned ROI and
-mask arrays. All scales, rescue rules, fit windows and quality gates match v1.0.
+mask arrays. Detection scales are unchanged; bending uses continuous local
+geometric directions and bounded terminal quality checks.
 """
 
 import numpy as np
@@ -9,6 +10,7 @@ from scipy import ndimage
 
 from .detector import _detect_neck_polarities, lines_gauss
 from .measurement import measure_bending
+from .robust_measurement import window_direction_ranges
 
 SCALES = (1.0, 1.5, 2.0, 2.5, 3.0)
 RESCUE_SCALES = (3.5, 4.0, 4.5)
@@ -71,11 +73,10 @@ def candidate_runs(image, geometry, scales=SCALES):
                 if contour.closed or len(contour.points) < 6:
                     continue
                 metrics = contour_metrics(contour, geometry)
-                # The relaxed length is for a separately labelled LOCAL estimate only.
                 try:
-                    local = measure_bending(contour, min_window_length=0.5)
+                    local = measure_bending(contour)
                 except ValueError:
-                    continue
+                    local = None
                 records.append(
                     _Candidate(
                         contour,
@@ -85,7 +86,7 @@ def candidate_runs(image, geometry, scales=SCALES):
                             "polarity": polarity,
                             "contour_index": index,
                             **metrics,
-                            "local_angle_deg": local.angle_deg,
+                            "local_angle_deg": None if local is None else local.angle_deg,
                             "points": contour.points,
                         },
                     )
@@ -120,29 +121,47 @@ def choose_candidate(candidates):
     adequate = [c for c in eligible if c["span_coverage"] >= 0.75 and c["length_px"] >= 15]
     if adequate:
         eligible = adequate
+    measurable = [c for c in eligible if c["local_angle_deg"] is not None]
+    if measurable:
+        eligible = measurable
     return max(
         eligible,
         key=lambda c: (-abs(c["sigma"] - 2.0), c["centrality"], c["sigma"]),
     )
 
 
-def assess(contour, selected, candidates):
+def assess(contour, selected, candidates, geometry=None):
     local = (
         selected.local_measurement
         if isinstance(selected, _Candidate) and selected.contour is contour
-        else measure_bending(contour, min_window_length=0.5)
+        else None
     )
+    if local is None:
+        try:
+            local = measure_bending(contour)
+        except ValueError:
+            pass
     flags = []
     if selected["span_coverage"] < 0.75:
         flags.append("insufficient_span_coverage")
-    try:
-        # Only the validation threshold differs from the already computed fit.
-        if 0.2 * local.arc_length_px < 3.0:
-            raise ValueError("Fit windows shorter than 3 pixels")
-        measurement = local
-    except ValueError:
-        measurement = None
-        flags.append("fit_windows_shorter_than_3px")
+    measurement = local
+    if measurement is None:
+        flags.append("insufficient_direction_samples")
+    else:
+        flags.extend(measurement.quality_flags)
+    trusted_coverage = selected["span_coverage"]
+    if measurement is not None and geometry is not None:
+        trusted = contour.points[measurement.valid_point_start:measurement.valid_point_stop]
+        trusted_coverage = float(np.ptp(trusted @ geometry["axis"]) / geometry["span"])
+        if trusted_coverage < .75:
+            flags.append("insufficient_trusted_span_coverage")
+    window_sensitivity = []
+    if measurement is not None:
+        window_sensitivity=window_direction_ranges(contour,measurement)
+    window_angles = [item["angle_deg"] for item in window_sensitivity]
+    window_range = [min(window_angles), max(window_angles)] if window_angles else None
+    if window_range and window_range[1] - window_range[0] > 5:
+        flags.append("window_sensitive_over_5deg")
     # Extent measures projection on the mask's major axis, NOT anatomical truth.
     nearby = []
     for sigma in sorted({c["sigma"] for c in candidates}):
@@ -152,59 +171,38 @@ def assess(contour, selected, candidates):
         if not options:
             continue
         item = max(options, key=lambda c: (c["span_coverage"], c["centrality"]))
-        if item["span_coverage"] >= selected["span_coverage"] - 0.08 and item["length_px"] >= 15:
+        if (item["span_coverage"] >= selected["span_coverage"] - 0.08
+                and item["length_px"] >= 15 and item["local_angle_deg"] is not None):
             nearby.append(item["local_angle_deg"])
     scale_range = [float(min(nearby)), float(max(nearby))] if nearby else None
     if len(nearby) < 2:
         flags.append("insufficient_comparable_scales")
     elif scale_range[1] - scale_range[0] > 5:
         flags.append("scale_sensitive_over_5deg")
-    window_angles = []
-    for window in (0.15, 0.2, 0.25):
-        try:
-            m = (
-                measurement
-                if window == 0.2 and measurement is not None
-                else measure_bending(contour, window_fraction=window)
-            )
-            window_angles.append({"window_fraction": window, "angle_deg": m.angle_deg})
-        except ValueError:
-            pass
-    window_range = (
-        [min(v["angle_deg"] for v in window_angles), max(v["angle_deg"] for v in window_angles)]
-        if window_angles
-        else None
-    )
-    if window_range and window_range[1] - window_range[0] > 5:
-        flags.append("window_sensitive_over_5deg")
     if selected["centrality"] < 0.4:
         flags.append("ridge_near_mask_boundary")
     if selected["sigma"] > max(SCALES):
         flags.append("large_scale_rescue_requires_review")
-    insufficient = "insufficient_span_coverage" in flags or measurement is None
+    insufficient = ("insufficient_span_coverage" in flags or measurement is None
+                    or "insufficient_trusted_span_coverage" in flags)
     status = "insufficient_segment" if insufficient else "review_required" if flags else "estimated"
     return {
         "status": status,
         "angle_deg": None if insufficient else measurement.angle_deg,
-        "local_segment_angle_deg": local.angle_deg,
-        "measurement": (measurement or local).to_dict(),
+        "local_segment_angle_deg": None if local is None else local.angle_deg,
+        "measurement": {} if measurement is None else measurement.to_dict(),
         "quality_flags": flags,
         "scale_angle_range_deg": scale_range,
         "comparable_scale_count": len(nearby),
+        "angle_method": "geometry_arclength_direction_range_v2",
+        "trusted_span_coverage": trusted_coverage,
         "window_angle_range_deg": window_range,
-        "window_sensitivity": window_angles,
+        "window_sensitivity": window_sensitivity,
     }
 
 
-def measure_neck(roi, neck_mask):
-    """Return angle and quality diagnostics from resident ROI/mask arrays.
-
-    Accepts grayscale or RGB(A) ROI and aligned 2-D or RGB(A) nonzero mask.
-    Preserve original intensities (normally 0..255); do not normalize to 0..1.
-    A fresh complete adaptive search runs for every input. No file reads, plots,
-    saved per-image parameters, or cross-image mutable caches are involved.
-    angle_deg is None when no sufficiently complete measurable segment exists.
-    """
+def _prepare_neck_inputs(roi, neck_mask):
+    """The same validation/conversion for serial and parallel scale workers."""
     image = np.asarray(roi)
     if image.ndim == 3 and image.shape[-1] >= 3:
         image = np.asarray(image[..., :3], dtype=np.float64) @ np.array([0.299, 0.587, 0.114])
@@ -219,17 +217,35 @@ def measure_neck(roi, neck_mask):
         raise ValueError("Expected aligned 2-D or RGB ROI and neck mask")
     if not np.isfinite(image).all():
         raise ValueError("image contains NaN or infinity")
-    geometry = mask_geometry(mask)
-    candidates = candidate_runs(image, geometry)
-    if not any(c["span_coverage"] >= 0.75 and c["length_px"] >= 15 for c in candidates):
-        candidates.extend(candidate_runs(image, geometry, RESCUE_SCALES))
+    return image, mask
+
+
+def _neck_result(geometry, candidates):
+    """Select and assess after all required scales, always in policy order."""
     selected = choose_candidate(candidates)
     if selected is None:
         return {"angle_deg": None, "status": "no_line"}
     return {
         **{k: v for k, v in selected.items() if k not in ("points", "local_angle_deg")},
-        **assess(selected.contour, selected, candidates),
+        **assess(selected.contour, selected, candidates, geometry),
         **{
             k: geometry[k] for k in ("component_count", "ignored_mask_pixels", "touches_roi_border")
         },
     }
+
+
+def measure_neck(roi, neck_mask):
+    """Return angle and quality diagnostics from resident ROI/mask arrays.
+
+    Accepts grayscale or RGB(A) ROI and aligned 2-D or RGB(A) nonzero mask.
+    Preserve original intensities (normally 0..255); do not normalize to 0..1.
+    A fresh complete adaptive search runs for every input. No file reads, plots,
+    saved per-image parameters, or cross-image mutable caches are involved.
+    angle_deg is None when no sufficiently complete measurable segment exists.
+    """
+    image, mask = _prepare_neck_inputs(roi, neck_mask)
+    geometry = mask_geometry(mask)
+    candidates = candidate_runs(image, geometry)
+    if not any(c["span_coverage"] >= 0.75 and c["length_px"] >= 15 for c in candidates):
+        candidates.extend(candidate_runs(image, geometry, RESCUE_SCALES))
+    return _neck_result(geometry, candidates)
