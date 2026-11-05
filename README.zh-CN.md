@@ -14,6 +14,10 @@
 `NeckAngleWorker(workers=5)`；通用wheel默认使用Python/SciPy计算。
 [构建与集成说明](docs/low-latency-worker.md)。
 
+可选编译模块已通过Windows x64、Linux x64的逐位一致性检查。macOS ARM64上
+仍有与SciPy的浮点末位差异，暂使用Python/SciPy后备计算，不构建可选模块。
+5.59 ms数据来自已经验证的Windows配置。
+
 之前的纯加速对照保存在[历史性能记录](reports/performance-followup/README.md)，
 其中旧角度和耗时不代表本版几何测角结果。
 

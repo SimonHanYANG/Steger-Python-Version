@@ -31,6 +31,12 @@ be revalidated when changing compiler, dependencies or deployment hardware.
 
 ## Local build and integration
 
+The compiled backend is validated on Windows x64 and Linux x64. macOS ARM64
+currently has last-bit interpolation differences from its SciPy build and fails
+the unchanged bitwise native tests. On macOS, use the Python/SciPy fallback and
+do not build the optional extension. CI tests that supported fallback separately;
+the strict compiled-backend tests remain available and are not relaxed.
+
 ```powershell
 uv sync --extra dev --extra native
 uv run --extra dev --extra native python tools/build_native.py

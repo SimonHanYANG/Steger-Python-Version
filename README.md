@@ -16,6 +16,11 @@ For the measured low-latency configuration, build the optional native module
 from source and reuse `NeckAngleWorker(workers=5)`; the universal wheel uses the
 Python/SciPy fallback. See [build and integration](docs/low-latency-worker.md).
 
+Native bitwise parity is validated on Windows x64 and Linux x64. On macOS ARM64,
+the compiled sampler has last-bit differences from SciPy and has not passed the
+same strict checks. Use the Python/SciPy fallback on macOS, without building the
+optional extension; the measured 5.59 ms configuration is the validated Windows setup.
+
 Earlier optimization-only comparisons remain in [performance history](reports/performance-followup/README.md).
 They predate the new angle definition and are not current-angle or current-runtime results.
 

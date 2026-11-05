@@ -25,9 +25,12 @@ jobs:
           python-version: "3.12"
           enable-cache: true
       - run: uv sync --frozen --extra dev --extra native
-      - run: uv run --frozen --extra dev --extra native python tools/build_native.py
+      - name: Build validated native backend (Linux)
+        if: runner.os != 'macOS'
+        run: uv run --frozen --extra dev --extra native python tools/build_native.py
       - run: uv run --frozen --extra dev --extra native pytest -q
       - name: Validate Python fallback
+        if: runner.os != 'macOS'
         env:
           STEGER_DISABLE_NATIVE: "1"
         run: uv run --frozen --extra dev --extra native pytest -q
