@@ -5,7 +5,7 @@ import os
 import numpy as np
 from scipy.ndimage import convolve1d, map_coordinates, spline_filter
 
-from .derivatives import gaussian_masks, hessian_normals, image_derivatives
+from .derivatives import gaussian_masks, hessian_normals, image_derivatives, validate_gaussian_truncate
 from .linking import complete_junctions as _complete
 from .linking import link_points
 from .refinement import refine_contour
@@ -56,6 +56,7 @@ def lines_gauss(
     refine=True,
     profile_refinement=True,
     return_trace=False,
+    gaussian_truncate=6.0,
 ):
     """Extract ordered, subpixel centerlines and per-point attributes.
 
@@ -101,7 +102,8 @@ def lines_gauss(
     selected = np.ones(img.shape, dtype=bool) if mask is None else np.asarray(mask) != 0
     if selected.shape != img.shape:
         raise ValueError("mask and image shapes must match; supply an aligned mask")
-    fields = _RidgeFields(img, sigma, border, selected, return_trace)
+    gaussian_truncate = validate_gaussian_truncate(gaussian_truncate)
+    fields = _RidgeFields(img, sigma, border, selected, return_trace, gaussian_truncate)
     return _extract(
         fields,
         sigma=sigma,
@@ -129,9 +131,10 @@ class _RidgeFields:
     computes the full field so process visualizations retain all original values.
     """
 
-    def __init__(self, image, sigma, border, selected, trace):
+    def __init__(self, image, sigma, border, selected, trace, gaussian_truncate=6.0):
         self.image = image
-        self.derivatives = d = image_derivatives(image, sigma, border=border)
+        self.gaussian_truncate = gaussian_truncate
+        self.derivatives = d = image_derivatives(image, sigma, border=border, gaussian_truncate=gaussian_truncate)
         self.eigenvalues = None
         self.pixels = None
         samples = d
@@ -176,7 +179,7 @@ class _RidgeFields:
         return self._native_coefficients
 
 
-def _detect_neck_polarities(image, mask, sigma, low, high):
+def _detect_neck_polarities(image, mask, sigma, low, high, *, gaussian_truncate=6.0):
     """Internal fixed-policy path; keep separate Newton stopping per polarity."""
     img = np.asarray(image, dtype=np.float64)
     selected = np.asarray(mask) != 0
@@ -186,7 +189,8 @@ def _detect_neck_polarities(image, mask, sigma, low, high):
         raise ValueError("mask and image shapes must match; supply an aligned mask")
     if not np.isfinite(img).all():
         raise ValueError("image contains NaN or infinity")
-    fields = _RidgeFields(img, sigma, "reflect", selected, False)
+    gaussian_truncate = validate_gaussian_truncate(gaussian_truncate)
+    fields = _RidgeFields(img, sigma, "reflect", selected, False, gaussian_truncate)
     return tuple(
         _extract(
             fields,
@@ -248,7 +252,7 @@ def _extract(
     strength = response[valid].copy()
     trace = None
     if return_trace:
-        g0 = gaussian_masks(sigma)[0]
+        g0 = gaussian_masks(sigma, fields.gaussian_truncate)[0]
         smoothed = convolve1d(convolve1d(img, g0, axis=0, mode=border), g0, axis=1, mode=border)
         trace = DetectionTrace(
             image=img.copy(),
@@ -348,6 +352,8 @@ def _extract(
         min_length=float(min_length),
     )
     total = sum(len(c.points) for c in contours)
+    if fields.gaussian_truncate != 6.0:
+        parameters['gaussian_truncate'] = fields.gaussian_truncate
     corrected = sum(np.count_nonzero(c.attributes.get("correction_valid", [])) for c in contours)
     return DetectionResult(
         contours,

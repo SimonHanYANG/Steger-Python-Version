@@ -49,14 +49,14 @@ def initialize(name, capacity):
 def profiled_scale(request):
     global _times
     _times = dict.fromkeys(('gaussian', 'hessian_taylor', 'subpixel', 'linking', 'candidate_fits'), 0.)
-    shape, axis, span, sigma = request
+    shape, axis, span, sigma, gaussian_truncate = request
     memory, capacity = module._shared_input
     image, distance, mask = module._workspace_views(memory, capacity, shape)
     for a in (image, distance, mask):
         a.flags.writeable = False
     geometry = dict(mask=mask, axis=axis, span=span, distance=distance)
     start = time.perf_counter_ns()
-    result = exclusive(neck.candidate_runs, 'candidate_fits')(image, geometry, (sigma,))
+    result = exclusive(neck.candidate_runs, 'candidate_fits')(image, geometry, (sigma,), gaussian_truncate=gaussian_truncate)
     duration = (time.perf_counter_ns() - start) / 1e6
     _times['candidate_fits'] += duration - sum(_times.values())
     return result, duration, _times
@@ -70,8 +70,8 @@ class ProfiledWorker(module.NeckAngleWorker):
             max_workers=5, mp_context=mp.get_context('spawn'), initializer=initialize,
             initargs=(self._memory.name, self._capacity))
 
-    def _candidates(self, image, geometry, scales):
-        requests = [(image.shape, geometry['axis'], geometry['span'], s) for s in scales]
+    def _candidates(self, image, geometry, scales, *, gaussian_truncate=6.0):
+        requests = [(image.shape, geometry['axis'], geometry['span'], s, gaussian_truncate) for s in scales]
         start = time.perf_counter_ns()
         groups = list(self._executor.map(profiled_scale, requests))
         elapsed = (time.perf_counter_ns() - start) / 1e6

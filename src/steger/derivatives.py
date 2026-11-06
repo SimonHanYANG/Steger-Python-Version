@@ -13,8 +13,21 @@ from scipy.special import ndtr
 from .types import FloatArray
 
 
+def validate_gaussian_truncate(value):
+    if not np.isscalar(value):
+        raise ValueError('gaussian_truncate must be finite and positive')
+    try:
+        value = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError('gaussian_truncate must be finite and positive') from exc
+    if not np.isfinite(value) or value <= 0:
+        raise ValueError('gaussian_truncate must be finite and positive')
+    return value
+
+
 @lru_cache(maxsize=64)
 def gaussian_masks(sigma: float, truncate: float = 6.0) -> tuple[FloatArray, ...]:
+    truncate = validate_gaussian_truncate(truncate)
     radius = max(2, int(np.ceil(truncate * sigma + 0.5)))
     x = np.arange(-radius, radius + 1, dtype=np.float64)
     lo, hi = x - 0.5, x + 0.5
@@ -34,9 +47,9 @@ def gaussian_masks(sigma: float, truncate: float = 6.0) -> tuple[FloatArray, ...
 
 
 def image_derivatives(
-    image: FloatArray, sigma: float, *, border: str = "reflect"
+    image: FloatArray, sigma: float, *, border: str = "reflect", gaussian_truncate=6.0
 ) -> dict[str, FloatArray]:
-    g0, g1, g2 = gaussian_masks(sigma)
+    g0, g1, g2 = gaussian_masks(sigma, validate_gaussian_truncate(gaussian_truncate))
     smooth_r = convolve1d(image, g0, axis=0, mode=border)
     first_r = convolve1d(image, g1, axis=0, mode=border)
     second_r = convolve1d(image, g2, axis=0, mode=border)

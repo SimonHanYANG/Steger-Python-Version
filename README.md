@@ -2,6 +2,13 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
+**Experimental branch:** this branch starts from release `v1.0.2` and tests
+smaller Gaussian derivative kernels. The default remains unchanged. A 19×19
+example kernel reduced full mean latency by 2.57% on the local 29-image set,
+with a maximum angle change of 0.001294°. This is not identical output.
+See [experiment, results and usage](docs/gaussian-support-experiment.md).
+The separate mask-only branch is preserved.
+
 **Current measurement update:** default bending uses the continuous local geometric
 direction range with arc-length windows and auditable terminal checks.
 See [measurement rules](docs/robust-neck-angle.md). The literal old C++ policy remains available as `measure_cpp_bending()`.

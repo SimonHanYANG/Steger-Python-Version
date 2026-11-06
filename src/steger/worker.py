@@ -13,6 +13,7 @@ from concurrent.futures import ProcessPoolExecutor
 from multiprocessing.shared_memory import SharedMemory
 
 import numpy as np
+from .derivatives import validate_gaussian_truncate
 
 from .neck import (
     RESCUE_SCALES,
@@ -53,7 +54,7 @@ def _workspace_views(memory, capacity, shape):
 
 
 def _run_scale(request):
-    shape, axis, span, sigma = request
+    shape, axis, span, sigma, gaussian_truncate = request
     memory, capacity = _shared_input
     image, distance, mask = _workspace_views(memory, capacity, shape)
     # No child writes the parent's workspace. Candidate/contour outputs are
@@ -61,7 +62,7 @@ def _run_scale(request):
     for array in (image, distance, mask):
         array.flags.writeable = False
     geometry = dict(mask=mask, axis=axis, span=span, distance=distance)
-    return candidate_runs(image, geometry, (sigma,))
+    return candidate_runs(image, geometry, (sigma,), gaussian_truncate=gaussian_truncate)
 
 
 def _ready(_):
@@ -78,7 +79,8 @@ class NeckAngleWorker:
     and warm once, outside the per-frame path. There is no hard latency bound.
     """
 
-    def __init__(self, workers=5, max_shape=(256, 256)):
+    def __init__(self, workers=5, max_shape=(256, 256), *, gaussian_truncate=6.0):
+        self.gaussian_truncate = validate_gaussian_truncate(gaussian_truncate)
         if not isinstance(workers, int) or workers < 1:
             raise ValueError("workers must be a positive integer")
         if len(max_shape) != 2 or any(not isinstance(n, int) or n < 3 for n in max_shape):
@@ -107,16 +109,17 @@ class NeckAngleWorker:
         if self._closed:
             raise RuntimeError("NeckAngleWorker is closed")
 
-    def _candidates(self, image, geometry, scales):
+    def _candidates(self, image, geometry, scales, *, gaussian_truncate=6.0):
         requests = [
-            (image.shape, geometry["axis"], geometry["span"], sigma) for sigma in scales
+            (image.shape, geometry["axis"], geometry["span"], sigma, gaussian_truncate) for sigma in scales
         ]
         # map retains policy scale order irrespective of completion order.
         return [c for group in self._executor.map(_run_scale, requests) for c in group]
 
-    def measure(self, roi, neck_mask):
+    def measure(self, roi, neck_mask, *, gaussian_truncate=None):
         with self._lock:
             self._check_open()
+            gaussian_truncate = self.gaussian_truncate if gaussian_truncate is None else validate_gaussian_truncate(gaussian_truncate)
             image, mask = _prepare_neck_inputs(roi, neck_mask)
             if any(a > b for a, b in zip(image.shape, self.max_shape, strict=True)):
                 raise ValueError(f"ROI shape {image.shape} exceeds max_shape={self.max_shape}")
@@ -128,9 +131,9 @@ class NeckAngleWorker:
             np.copyto(shared_distance, geometry["distance"])
             np.copyto(shared_mask, geometry["mask"])
             try:
-                candidates = self._candidates(image, geometry, SCALES)
+                candidates = self._candidates(image, geometry, SCALES, gaussian_truncate=gaussian_truncate)
                 if not any(c["span_coverage"] >= 0.75 and c["length_px"] >= 15 for c in candidates):
-                    candidates.extend(self._candidates(image, geometry, RESCUE_SCALES))
+                    candidates.extend(self._candidates(image, geometry, RESCUE_SCALES, gaussian_truncate=gaussian_truncate))
                 return _neck_result(geometry, candidates)
             except BaseException:
                 # A cancelled/failed request must not leave children reading a

@@ -119,7 +119,7 @@ def test_failed_child_request_closes_workspace_before_reuse(monkeypatch):
     worker = NeckAngleWorker(workers=1)
     worker.start()
 
-    def failed(*args):
+    def failed(*args, **kwargs):
         raise RuntimeError("test worker failure")
 
     monkeypatch.setattr(worker, "_candidates", failed)

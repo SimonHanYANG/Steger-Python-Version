@@ -9,6 +9,7 @@ import numpy as np
 from scipy import ndimage
 
 from .detector import _detect_neck_polarities, lines_gauss
+from .derivatives import validate_gaussian_truncate
 from .measurement import measure_bending
 from .robust_measurement import window_direction_ranges
 
@@ -64,10 +65,11 @@ def contour_metrics(contour, geometry):
     return {"span_coverage": coverage, "centrality": centrality, "length_px": contour.length}
 
 
-def candidate_runs(image, geometry, scales=SCALES):
+def candidate_runs(image, geometry, scales=SCALES, *, gaussian_truncate=6.0):
     records = []
     for sigma in scales:
-        results = _detect_neck_polarities(image, geometry["mask"], sigma, LOW, HIGH)
+        results = _detect_neck_polarities(image, geometry["mask"], sigma, LOW, HIGH,
+                                        gaussian_truncate=gaussian_truncate)
         for polarity, result in zip(("dark", "light"), results, strict=True):
             for index, contour in enumerate(result.contours):
                 if contour.closed or len(contour.points) < 6:
@@ -94,7 +96,7 @@ def candidate_runs(image, geometry, scales=SCALES):
     return records
 
 
-def detect(image, mask, sigma, polarity, *, trace=False):
+def detect(image, mask, sigma, polarity, *, trace=False, gaussian_truncate=6.0):
     # Width/asymmetry/profile models have not been validated on these phase-like
     # real micrographs. Keep the measured grayscale ridge and expose every stage.
     return lines_gauss(
@@ -109,6 +111,7 @@ def detect(image, mask, sigma, polarity, *, trace=False):
         mask=mask,
         profile_refinement=False,
         return_trace=trace,
+        gaussian_truncate=gaussian_truncate,
     )
 
 
@@ -234,7 +237,7 @@ def _neck_result(geometry, candidates):
     }
 
 
-def measure_neck(roi, neck_mask):
+def measure_neck(roi, neck_mask, *, gaussian_truncate=6.0):
     """Return angle and quality diagnostics from resident ROI/mask arrays.
 
     Accepts grayscale or RGB(A) ROI and aligned 2-D or RGB(A) nonzero mask.
@@ -243,9 +246,10 @@ def measure_neck(roi, neck_mask):
     saved per-image parameters, or cross-image mutable caches are involved.
     angle_deg is None when no sufficiently complete measurable segment exists.
     """
+    gaussian_truncate = validate_gaussian_truncate(gaussian_truncate)
     image, mask = _prepare_neck_inputs(roi, neck_mask)
     geometry = mask_geometry(mask)
-    candidates = candidate_runs(image, geometry)
+    candidates = candidate_runs(image, geometry, gaussian_truncate=gaussian_truncate)
     if not any(c["span_coverage"] >= 0.75 and c["length_px"] >= 15 for c in candidates):
-        candidates.extend(candidate_runs(image, geometry, RESCUE_SCALES))
+        candidates.extend(candidate_runs(image, geometry, RESCUE_SCALES, gaussian_truncate=gaussian_truncate))
     return _neck_result(geometry, candidates)
