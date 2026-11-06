@@ -2,6 +2,13 @@
 
 **English** | [简体中文](README.zh-CN.md)
 
+**Latency experiment:** branch `experiment/latency-1ms-20261106` starts from
+release `v1.0.2`. Use `FastNeckAngleWorker` after rebuilding the optional native
+module. On the local 29-image paired test, full mean latency fell from 4.596 ms
+to 3.253 ms (29.2% lower); all 29 complete outputs and 796 candidate contours
+matched the release. The 1 ms target is not yet achieved.
+See [results, precision checks and integration](docs/latency-experiment.md).
+
 **Current measurement update:** default bending uses the continuous local geometric
 direction range with arc-length windows and auditable terminal checks.
 See [measurement rules](docs/robust-neck-angle.md). The literal old C++ policy remains available as `measure_cpp_bending()`.

@@ -63,12 +63,16 @@ def profiled_scale(request):
 
 
 class ProfiledWorker(module.NeckAngleWorker):
-    def __init__(self):
+    def __init__(self, fast=False):
         super().__init__(workers=5)
         self._executor.shutdown()
-        self._executor = ProcessPoolExecutor(
-            max_workers=5, mp_context=mp.get_context('spawn'), initializer=initialize,
-            initargs=(self._memory.name, self._capacity))
+        if fast:
+            from steger._direct_pool import DirectPool
+            self._executor = DirectPool(5, initialize, (self._memory.name, self._capacity))
+        else:
+            self._executor = ProcessPoolExecutor(
+                max_workers=5, mp_context=mp.get_context('spawn'), initializer=initialize,
+                initargs=(self._memory.name, self._capacity))
 
     def _candidates(self, image, geometry, scales):
         requests = [(image.shape, geometry['axis'], geometry['span'], s) for s in scales]
@@ -95,6 +99,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--rounds', type=int, default=60)
+    parser.add_argument('--fast', action='store_true')
     args = parser.parse_args()
     cases = []
     for path in sorted(Path('neck_mask').glob('*_mask.png')):
@@ -104,7 +109,7 @@ def main():
             mask = np.array(im)
         cases.append((path.stem, roi, mask, measure_neck(roi, mask)))
     records = []
-    with ProfiledWorker() as worker:
+    with ProfiledWorker(fast=args.fast) as worker:
         originals = {}
         for name, category in (('_prepare_neck_inputs', 'input_mask'), ('mask_geometry', 'input_mask'),
                                ('_neck_result', 'final_angle')):

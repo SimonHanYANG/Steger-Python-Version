@@ -4,12 +4,23 @@ The detector's original points/normals are never overwritten. Normal axes help
 identify an inconsistent terminal trace, but raw Hessian angles are not averaged
 to calculate bending. Defaults are geometry rules, independent of sample IDs.
 """
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 import math
+import os
 
 import numpy as np
 
 from .types import Contour
+
+try:
+    if os.environ.get('STEGER_DISABLE_NATIVE') == '1':
+        raise ImportError('Native window sampling disabled explicitly')
+    from ._spline_native import window_samples as _native_window_samples
+    from ._spline_native import polyline_arcs as _native_polyline_arcs
+    from ._spline_native import distinct_samples as _native_distinct_samples
+except ImportError:
+    _native_window_samples = None
+    _native_polyline_arcs = _native_distinct_samples = None
 
 
 @dataclass(frozen=True)
@@ -35,7 +46,22 @@ class RobustBendingMeasurement:
     method: str = "geometry_arclength_direction_range_v2"
 
     def to_dict(self):
-        return asdict(self)
+        # All fields are immutable scalars or nested tuples. A shallow dictionary
+        # copy preserves the former asdict result without recursively copying
+        # every direction/window value on each ROI.
+        return dict(vars(self))
+
+
+def _arcs(points):
+    if _native_polyline_arcs is not None:
+        return _native_polyline_arcs(points)
+    return np.r_[0.,np.cumsum(np.linalg.norm(np.diff(points,axis=0),axis=1))]
+
+
+def _distinct(points):
+    if _native_distinct_samples is not None:
+        return _native_distinct_samples(points)
+    return np.r_[True,np.linalg.norm(np.diff(points,axis=0),axis=1)>1e-9]
 
 
 def _axis_error(normal, tangent):
@@ -117,10 +143,14 @@ def _fit_direction_windows(points, arc, fraction, trim=.05, spacing=.25, step=1.
     count=max(2,int(np.ceil((last-first)/step))+1)
     starts=np.linspace(first,last,count)
     offsets=np.linspace(0.,width,max(5,int(np.ceil(width/spacing))+1))
-    q=starts[:,None]+offsets[None,:]
-    samples=np.stack([np.interp(q,arc,points[:,axis]) for axis in range(2)],axis=-1)
-    centered=samples-samples.mean(axis=1,keepdims=True)
-    directions=_tls_directions(centered,samples[:,-1]-samples[:,0])
+    if _native_window_samples is not None:
+        centered,travel=_native_window_samples(points,arc,starts,offsets)
+    else:
+        q=starts[:,None]+offsets[None,:]
+        samples=np.stack([np.interp(q,arc,points[:,axis]) for axis in range(2)],axis=-1)
+        centered=samples-samples.mean(axis=1,keepdims=True)
+        travel=samples[:,-1]-samples[:,0]
+    directions=_tls_directions(centered,travel)
     angles=np.unwrap(np.arctan2(directions[:,0],directions[:,1]))
     return starts,centered,directions,angles
 
@@ -128,9 +158,9 @@ def _fit_direction_windows(points, arc, fraction, trim=.05, spacing=.25, step=1.
 def window_direction_ranges(contour, measurement, fractions=(.15,.25)):
     """Reuse the validated segment for sensitivity; identical fit computation."""
     points=contour.points[measurement.valid_point_start:measurement.valid_point_stop]
-    keep=np.r_[True,np.linalg.norm(np.diff(points,axis=0),axis=1)>1e-9]
+    keep=_distinct(points)
     points=points[keep]
-    arc=np.r_[0.,np.cumsum(np.linalg.norm(np.diff(points,axis=0),axis=1))]
+    arc=_arcs(points)
     values=[dict(window_fraction=measurement.window_fraction,angle_deg=measurement.angle_deg)]
     for fraction in fractions:
         if fraction*arc[-1]<3.:
@@ -168,17 +198,16 @@ def measure_robust_bending(contour: Contour, *, window_fraction=.2,
         raise ValueError("Expected finite Nx2 coordinates and normals")
     if len(original) < 6:
         raise ValueError("Too few centerline points for geometric measurement")
-    keep = np.r_[True, np.linalg.norm(np.diff(original, axis=0), axis=1) > 1e-9]
+    keep = _distinct(original)
     ids = np.flatnonzero(keep)
     points, normals = original[keep], normals[keep]
     if len(points) < 6:
         raise ValueError("Too few distinct centerline points")
-    lengths = np.linalg.norm(np.diff(points, axis=0), axis=1)
-    original_arc = np.r_[0., np.cumsum(lengths)]
+    original_arc = _arcs(points)
     start, stop = _terminal_segment(points, normals, original_arc)
     valid_ids = ids[start:stop]
     points, normals = points[start:stop], normals[start:stop]
-    arc = np.r_[0., np.cumsum(np.linalg.norm(np.diff(points, axis=0), axis=1))]
+    arc = _arcs(points)
     length = float(arc[-1])
     width = window_fraction * length
     if width < min_window_length:

@@ -33,6 +33,17 @@ def native_acceleration_available():
     return _native_refine_points is not None
 
 
+def fast_acceleration_available():
+    """True only when all routines required for this experiment are loaded."""
+    from . import linking, robust_measurement
+    return native_acceleration_available() and all(function is not None for function in (
+        linking._native_deduplicate, linking._native_link_paths,
+        linking._native_orient, linking._native_neighbor_graph,
+        linking._native_radius_neighbors, robust_measurement._native_window_samples,
+        robust_measurement._native_polyline_arcs, robust_measurement._native_distinct_samples,
+    ))
+
+
 def _attach_workspace(name, capacity):
     global _shared_input
     _shared_input = (SharedMemory(name=name), capacity)
@@ -160,3 +171,33 @@ class NeckAngleWorker:
 
     def __exit__(self, *_):
         self.close()
+
+
+class FastNeckAngleWorker(NeckAngleWorker):
+    """Same full-scale calculation with direct persistent process connections.
+
+    The input contract, result, locking, rescue and selection are unchanged.
+    Construct once under __main__ and reuse, just like NeckAngleWorker.
+    """
+
+    def __init__(self, workers=5, max_shape=(256, 256)):
+        from ._direct_pool import DirectPool
+
+        super().__init__(workers=workers, max_shape=max_shape)
+        self._executor.shutdown()
+        self._executor = DirectPool(workers, _attach_workspace,
+                                    (self._memory.name, self._capacity))
+        atexit.register(self.close)
+
+    def start(self):
+        try:
+            return super().start()
+        except BaseException:
+            self.close()
+            raise
+
+    def close(self):
+        try:
+            super().close()
+        finally:
+            atexit.unregister(self.close)

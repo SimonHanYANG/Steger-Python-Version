@@ -1,14 +1,30 @@
 """Direction-aware hysteresis linking, topology and explicit junction completion."""
 
+import os
 import numpy as np
 from scipy.spatial import cKDTree
 
 from .types import Contour, Junction
 
+try:
+    if os.environ.get('STEGER_DISABLE_NATIVE') == '1':
+        raise ImportError('Native linking disabled explicitly')
+    from ._spline_native import deduplicate_indices as _native_deduplicate
+    from ._spline_native import link_paths as _native_link_paths
+    from ._spline_native import orient_path_normals as _native_orient
+    from ._spline_native import neighbor_graph as _native_neighbor_graph
+    from ._spline_native import radius_neighbors as _native_radius_neighbors
+except ImportError:
+    _native_deduplicate = _native_link_paths = _native_orient = _native_neighbor_graph = None
+    _native_radius_neighbors = None
+
 
 def orient_normals(points, normals):
     if len(points) < 2:
         return normals.copy()
+    if (_native_orient is not None and isinstance(points, np.ndarray)
+            and points.dtype == np.float64 and normals.dtype == np.float64):
+        return _native_orient(points, normals)
     # Same unit-spacing first-order boundary / centered interior differences as
     # np.gradient, avoiding its general N-D argument processing for short paths.
     points = np.asarray(points)
@@ -30,6 +46,11 @@ def _neighbor_graph(points, normals, neighbors):
     Keep i/sign order and the original (score, j) tie break when inserting
     undirected edges, so Python set traversal and contour ordering stay intact.
     """
+    if (_native_neighbor_graph is not None and points.dtype == np.float64
+            and normals.dtype == np.float64):
+        native_graph = _native_neighbor_graph(points, normals, neighbors)
+        if native_graph is not None:
+            return native_graph
     graph = [set() for _ in points]
     ii = np.repeat(np.arange(len(points)), [len(x) for x in neighbors])
     jj = np.concatenate(neighbors).astype(np.intp, copy=False)
@@ -67,24 +88,44 @@ def link_points(points, normals, responses, high):
     if not len(points):
         return [], []
     # Several pixels may describe essentially the same subpixel line point.
-    tree = cKDTree(points)
     keep = np.ones(len(points), dtype=bool)
     # Query dispatch is expensive for short necks. Batch small clouds; retain
     # the sequential path for large/dense inputs to bound temporary storage.
-    duplicates = (
-        tree.query_ball_point(points, 0.22, return_sorted=False) if len(points) <= 512 else None
-    )
-    for i in np.argsort(-responses, kind="stable"):
-        if keep[i]:
-            for j in (
-                duplicates[i] if duplicates is not None else tree.query_ball_point(points[i], 0.22)
-            ):
-                if j != i:
-                    keep[j] = False
+    duplicates = None
+    if _native_radius_neighbors is not None and points.dtype == np.float64 and len(points) <= 192:
+        duplicates = _native_radius_neighbors(points, .22)
+    if duplicates is None:
+        tree = cKDTree(points)
+        duplicates = tree.query_ball_point(points, .22, return_sorted=False) if len(points) <= 512 else None
+    order = np.argsort(-responses, kind="stable")
+    if _native_deduplicate is not None and duplicates is not None:
+        keep = _native_deduplicate(duplicates, order)
+    else:
+        for i in order:
+            if keep[i]:
+                for j in (
+                    duplicates[i] if duplicates is not None else tree.query_ball_point(points[i], 0.22)
+                ):
+                    if j != i:
+                        keep[j] = False
     points, normals, responses = points[keep], normals[keep], responses[keep]
-    tree = cKDTree(points)
-    neighbors = tree.query_ball_point(points, 1.85)
+    neighbors = None
+    if _native_radius_neighbors is not None and points.dtype == np.float64 and len(points) <= 192:
+        neighbors = _native_radius_neighbors(points, 1.85)
+    if neighbors is None:
+        tree = cKDTree(points)
+        neighbors = tree.query_ball_point(points, 1.85)
     graph = _neighbor_graph(points, normals, neighbors)
+    if _native_link_paths is not None and responses.dtype == np.float64:
+        paths, membership = _native_link_paths(graph, np.ascontiguousarray(responses), high)
+        contours = []
+        for path in paths:
+            ids = np.asarray(path)
+            p, n = points[ids], normals[ids]
+            contours.append(Contour(p, orient_normals(p, n), responses[ids], closed=path[0] == path[-1]))
+        junctions = [Junction(points[k].copy(), tuple(sorted(v)))
+                     for k, v in membership.items() if len(v) > 1]
+        return contours, junctions
     active = np.zeros(len(points), dtype=bool)
     seen = set()
     for i in range(len(points)):

@@ -43,7 +43,12 @@ def mask_geometry(mask):
     span = float(np.ptp(pixels @ axis))
     if span < 1:
         raise ValueError("Degenerate mask extent")
-    distance = ndimage.distance_transform_edt(np.pad(selected, 1))[1:-1, 1:-1]
+    # Only the binary distance calculation is cropped. The component's bounding
+    # rectangle plus one zero border contains all nearest background pixels.
+    first, last = pixels.min(axis=0), pixels.max(axis=0) + 1
+    region = tuple(slice(int(a), int(b)) for a, b in zip(first, last, strict=True))
+    distance = np.zeros(selected.shape, dtype=np.float64)
+    distance[region] = ndimage.distance_transform_edt(np.pad(selected[region], 1))[1:-1, 1:-1]
     return {
         "mask": selected,
         "axis": axis,
