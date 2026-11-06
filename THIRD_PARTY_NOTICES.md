@@ -1,6 +1,7 @@
 # Third-party notices
 
-The optional `src/steger/_spline_native.pyx` sampler adapts the cubic spline
+The optional `src/steger/_spline_native.pyx` sampler and the experimental
+`src/steger/_mask_native.pyx` cubic basis adapt the cubic spline
 weights, reflect-coordinate mapping and interpolation accumulation order from
 SciPy's `scipy/ndimage/src/ni_splines.c` and `ni_interpolation.c`:
 

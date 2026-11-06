@@ -1,5 +1,10 @@
 # Steger Python Version
 
+> This is `experiment/mask-only-20261106`. Use `steger.mask_only.MaskOnlyNeckAngleWorker`
+> for the strict-mask experiment; existing APIs remain the main control.
+> Paired mean latency: 5.93 -> 8.54 ms; final angles: 26 -> 16 of 29 inputs.
+> See [experiment and reproduction notes](docs/experiments/mask-only.md).
+
 **English** | [简体中文](README.zh-CN.md)
 
 **Current measurement update:** default bending uses the continuous local geometric

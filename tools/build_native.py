@@ -17,7 +17,8 @@ setup(
     packages=['steger'],
     package_dir={'': 'src'},
     ext_modules=cythonize(
-        [Extension('steger._spline_native', ['src/steger/_spline_native.pyx'], extra_compile_args=flags)],
+        [Extension('steger._spline_native', ['src/steger/_spline_native.pyx'], extra_compile_args=flags),
+         Extension('steger._mask_native', ['src/steger/_mask_native.pyx'], extra_compile_args=flags)],
         compiler_directives={'language_level': 3},
         build_dir='build/cython',
     ),

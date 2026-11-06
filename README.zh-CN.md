@@ -1,5 +1,10 @@
 # Steger Python Version
 
+> 当前为严格mask内实验分支 `experiment/mask-only-20261106`。实验入口是
+> `steger.mask_only.MaskOnlyNeckAngleWorker`；原有接口保留为main对照。
+> 本轮平均5.93ms → 8.54ms，有角度26张 → 16张，暂不替换main。
+> [实验说明与运行方法](docs/experiments/mask-only.md)。
+
 [English](README.md) | **简体中文**
 
 **当前测角口径：**默认采用有效中心线的“等弧长局部几何方向范围”，修正原始法向角周期跳变，并检查异常末端。
